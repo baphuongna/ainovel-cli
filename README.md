@@ -13,11 +13,21 @@
 
 ## 🌟 Điểm Nổi Bật Của Bản Việt Hóa & Đa Ngôn Ngữ
 
-- 🇻🇳 **Giao diện TUI Việt hóa 100%**: Từ Setup Wizard cài đặt ban đầu, màn hình chào mừng, thanh trạng thái, Activity stream trực tiếp, bảng quản lý Provider/Model (`/config`, `/model`) đến thông báo lỗi và phím tắt đều được dịch sang Tiếng Việt chuẩn mực, tự nhiên.
+- 🇻🇳 **Giao diện TUI Việt hóa 100%** (tài liệu thiết kế trong `docs/` vẫn là tiếng Trung): Từ Setup Wizard cài đặt ban đầu, màn hình chào mừng, thanh trạng thái, Activity stream trực tiếp, bảng quản lý Provider/Model (`/config`, `/model`) đến thông báo lỗi và phím tắt đều được dịch sang Tiếng Việt chuẩn mực, tự nhiên.
 - 🌐 **Tùy chọn Ngôn ngữ sáng tác truyện**: Hỗ trợ viết truyện bằng **Tiếng Việt (mặc định)** hoặc **Tiếng Trung nguyên bản** qua trường `"language": "vi"` hoặc `"language": "zh"` trong cấu hình.
 - 🦙 **Tích hợp sẵn Ollama Local**: Hỗ trợ chạy 100% offline, miễn phí không tốn tiền API với các model mã nguồn mở chạy trên GPU nội bộ (Qwen 2.5 / 3.5, Llama, v.v.).
 - ✍️ **Bộ Prompt song ngữ & Văn phong chống AI sáo rỗng**: 14 prompt hệ thống được tinh chỉnh kỹ lưỡng, kèm file quy chuẩn văn phong tiểu thuyết Tiếng Việt (`assets/voice.md`) giúp hành văn sống động, gãy gọn, có chiều sâu, bài trừ các mẫu câu sáo rỗng của AI.
 - 🚀 **Đồng bộ toàn diện Upstream mới nhất**: Sở hữu đầy đủ kiến trúc Đa Agent (`Coordinator` → `Architect` → `Writer` → `Editor` → `Arbiter`), Prompt Caching 3 tầng, quy hoạch cuộn 2 tầng (Rolling planning), điểm phục hồi step-level, và toàn bộ 14 lệnh slash commands.
+
+---
+
+## 📌 Ghi Chú Về Bản Fork
+
+- **Nguồn cập nhật**: lệnh `ainovel-cli update`, script `scripts/install.sh` và `docker-compose.yml` đều trỏ về repo này (`baphuongna/ainovel-cli`). Bản gốc tiếng Trung là [voocel/ainovel-cli](https://github.com/voocel/ainovel-cli); muốn cài bản gốc: `AINOVEL_REPO=voocel/ainovel-cli sh scripts/install.sh`. Tự cập nhật và script cài đặt chỉ hoạt động khi repo có GitHub Release (đẩy tag `v*` để workflow `release.yml` tạo).
+- **Docker**: `docker compose` build image cục bộ tên `ainovel-cli-vi:local` (`pull_policy: build`) nên không bao giờ kéo nhầm image upstream.
+- **Số chữ / độ dài chương**: với truyện tiếng Việt, độ dài được đếm theo **từ** (âm tiết); truyện tiếng Trung vẫn đếm theo ký tự như bản gốc. Quy tắc kiểu "mỗi chương khoảng 3000 từ" vì vậy khớp với con số hiển thị trong TUI và `/diag`. Truyện viết bằng phiên bản cũ sẽ được tự động tính lại số từ khi mở lại (định dạng dự án v3).
+- **Giới hạn cung truyện**: mỗi cung (arc) tối đa 8 chương chi tiết để Editor có thể đọc trọn cả cung khi xem xét cuối cung; mạch truyện dài hơn được tự động chia thành nhiều cung liên tiếp.
+- **Tài liệu kỹ thuật**: TUI, prompt và tài liệu tham khảo cho agent đã Việt hóa; riêng thư mục `docs/` (thiết kế kiến trúc) hiện vẫn là **tiếng Trung** của bản gốc.
 
 ---
 
@@ -56,7 +66,7 @@
 ## 1. Yêu Cầu Hệ Thống
 
 - **Khuyến nghị nhất**: [Docker](https://www.docker.com/) & Docker Desktop (Windows / macOS / Linux).
-- **Hoặc chạy từ Source**: Máy tính đã cài đặt [Go](https://go.dev/) ≥ 1.21.
+- **Hoặc chạy từ Source**: Máy tính đã cài đặt [Go](https://go.dev/) ≥ 1.25 (theo `go.mod`; Go cũ hơn sẽ báo lỗi khi build).
 - **LLM**: 
   - Máy có GPU (Nvidia VRAM ≥ 12GB) nếu muốn chạy Ollama cục bộ với model Qwen 2.5 / 3.5.
   - Hoặc API Key từ OpenRouter, Anthropic, Google Gemini, OpenAI, DeepSeek.
@@ -67,7 +77,7 @@
 
 ### Bước 1: Clone Repo & Chuẩn Bị Thư Mục
 ```bash
-git clone https://github.com/kentjuno/ainovel-cli.git
+git clone https://github.com/baphuongna/ainovel-cli.git
 cd ainovel-cli
 
 # Tạo thư mục chứa cấu hình và thư mục chứa truyện
@@ -110,7 +120,7 @@ File cấu hình đặt tại `config/config.json`:
    - Trên PowerShell (Windows):
      ```powershell
      @"
-     FROM qwen2.5:14b
+     FROM qwen3:14b
      PARAMETER num_ctx 65536
      "@ | Out-File -FilePath "$env:TEMP\ainovel.Modelfile" -Encoding ascii
 
@@ -144,7 +154,7 @@ File cấu hình đặt tại `config/config.json`:
 {
   "language": "vi",
   "provider": "openrouter",
-  "model": "anthropic/claude-3.5-sonnet",
+  "model": "anthropic/claude-sonnet-4.6",
   "providers": {
     "openrouter": {
       "api_key": "sk-or-v1-YOUR_OPENROUTER_API_KEY"
@@ -192,7 +202,7 @@ File cấu hình đặt tại `config/config.json`:
 
 ### Phối hợp nhiều Model theo vai trò
 
-Hệ thống cho phép gán model mạnh (Claude 3.5 Sonnet / DeepSeek Reasoner) làm **Biên tập / Kiến trúc sư** và model rẻ/nhanh (DeepSeek Chat / Ollama) làm **Người viết**:
+Hệ thống cho phép gán model mạnh (Claude Sonnet 4.6 / DeepSeek Reasoner) làm **Biên tập / Kiến trúc sư** và model rẻ/nhanh (DeepSeek Chat / Ollama) làm **Người viết**:
 
 ```json
 {
@@ -204,8 +214,8 @@ Hệ thống cho phép gán model mạnh (Claude 3.5 Sonnet / DeepSeek Reasoner)
     "openrouter": { "api_key": "sk-or-v1-YOUR_KEY" }
   },
   "roles": {
-    "architect": { "provider": "openrouter", "model": "anthropic/claude-3.5-sonnet" },
-    "editor": { "provider": "openrouter", "model": "anthropic/claude-3.5-sonnet" },
+    "architect": { "provider": "openrouter", "model": "anthropic/claude-sonnet-4.6" },
+    "editor": { "provider": "openrouter", "model": "anthropic/claude-sonnet-4.6" },
     "writer": { "provider": "ollama", "model": "ainovel-qwen" }
   },
   "context_window": 65536,

@@ -25,7 +25,7 @@
 ## 1. Yêu Cầu Hệ Thống
 
 - **Khuyến nghị nhất**: Đã cài đặt [Docker](https://www.docker.com/) & Docker Desktop (Windows / macOS / Linux).
-- **Hoặc Chạy từ Source**: Máy đã cài đặt [Go](https://go.dev/) ≥ 1.21.
+- **Hoặc Chạy từ Source**: Máy đã cài đặt [Go](https://go.dev/) ≥ 1.25 (theo `go.mod`; Go cũ hơn sẽ báo lỗi khi build).
 - **LLM**: 
   - Máy có GPU (Nvidia VRAM ≥ 12GB) nếu muốn chạy Ollama cục bộ với model Qwen 2.5 / 3.5.
   - Hoặc API Key từ OpenRouter, Anthropic, Google Gemini, OpenAI, DeepSeek.
@@ -71,7 +71,7 @@ Tạo file `config/config.json` trong thư mục `Ainovel-cli`:
    - Mở PowerShell / Terminal và chạy:
      ```powershell
      @"
-     FROM qwen2.5:14b
+     FROM qwen3:14b
      PARAMETER num_ctx 65536
      "@ | Out-File -FilePath "$env:TEMP\ainovel.Modelfile" -Encoding ascii
 
@@ -105,7 +105,7 @@ Tạo file `config/config.json` trong thư mục `Ainovel-cli`:
 {
   "language": "vi",
   "provider": "openrouter",
-  "model": "anthropic/claude-3.5-sonnet",
+  "model": "anthropic/claude-sonnet-4.6",
   "providers": {
     "openrouter": {
       "api_key": "sk-or-v1-YOUR_OPENROUTER_API_KEY"
@@ -152,7 +152,7 @@ Tạo file `config/config.json` trong thư mục `Ainovel-cli`:
 ---
 
 ### Cách 3: Phối hợp nhiều Model theo vai trò (Tối ưu chi phí & chất lượng)
-Hệ thống cho phép gán model mạnh (Claude 3.5 Sonnet / DeepSeek Reasoner) làm **Biên tập / Kiến trúc sư** và model nhanh/rẻ (DeepSeek Chat / Ollama) làm **Người viết**:
+Hệ thống cho phép gán model mạnh (Claude Sonnet 4.6 / DeepSeek Reasoner) làm **Biên tập / Kiến trúc sư** và model nhanh/rẻ (DeepSeek Chat / Ollama) làm **Người viết**:
 
 ```json
 {
@@ -164,8 +164,8 @@ Hệ thống cho phép gán model mạnh (Claude 3.5 Sonnet / DeepSeek Reasoner)
     "openrouter": { "api_key": "sk-or-v1-YOUR_KEY" }
   },
   "roles": {
-    "architect": { "provider": "openrouter", "model": "anthropic/claude-3.5-sonnet" },
-    "editor": { "provider": "openrouter", "model": "anthropic/claude-3.5-sonnet" },
+    "architect": { "provider": "openrouter", "model": "anthropic/claude-sonnet-4.6" },
+    "editor": { "provider": "openrouter", "model": "anthropic/claude-sonnet-4.6" },
     "writer": { "provider": "ollama", "model": "ainovel-qwen" }
   },
   "context_window": 65536,
