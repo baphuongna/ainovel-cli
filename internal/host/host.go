@@ -138,6 +138,13 @@ func New(cfg bootstrap.Config, bundle assets.Bundle, options ...NewOption) (*Hos
 
 	slog.Info("Khởi động", "module", "boot", "provider", cfg.Provider, "model", cfg.ModelName, "output", cfg.OutputDir)
 
+	// Giá/cửa sổ do người dùng khai tường minh (model ngoài OpenRouter, proxy có biểu giá
+	// riêng) ghim vào registry TRƯỚC refresh nền — cờ Manual bảo vệ entry này khỏi bị dữ
+	// liệu OpenRouter đè; refresh chỉ bổ sung phần còn thiếu.
+	if entries := cfg.ManualPriceEntries(); len(entries) > 0 {
+		modelreg.DefaultRegistry().MergeModels(entries)
+		slog.Info("Đã nạp giá/cửa sổ do người dùng khai", "module", "models", "số_lượng", len(entries))
+	}
 	// Chạy goroutine nền làm mới metadata model từ OpenRouter (cửa sổ ngữ cảnh/giá), cache đĩa 24h.
 	modelreg.StartPricingRefresh(modelreg.DefaultRegistry(), bootstrap.DefaultConfigDir())
 
@@ -1673,13 +1680,13 @@ func (h *Host) ReplayQueue(afterSeq int64) ([]domain.RuntimeQueueItem, error) {
 
 // CoCreateStream đồng sáng tạo khởi động nguội: làm rõ nhu cầu từ số 0, sinh chỉ lệnh sáng tác cho cả cuốn sách.
 func (h *Host) CoCreateStream(ctx context.Context, history []CoCreateMessage, onProgress func(kind, text string)) (CoCreateReply, error) {
-	return coCreateStream(ctx, h.models, h.store.Sessions, coCreateSystemPrompt, history, onProgress)
+	return coCreateStream(ctx, h.models, h.store.Sessions, coCreateSystemPrompt, history, onProgress, h.usage.Record)
 }
 
 // StageCoCreateStream đồng sáng tạo theo giai đoạn: lập hướng đi tiếp theo trên nền nội dung đã viết.
 // System prompt = prompt giai đoạn + tóm tắt trạng thái truyện hiện tại, để trợ lý biết "đã viết tới đâu".
 func (h *Host) StageCoCreateStream(ctx context.Context, history []CoCreateMessage, onProgress func(kind, text string)) (CoCreateReply, error) {
-	return coCreateStream(ctx, h.models, h.store.Sessions, stageSystemPrompt(h.store), history, onProgress)
+	return coCreateStream(ctx, h.models, h.store.Sessions, stageSystemPrompt(h.store), history, onProgress, h.usage.Record)
 }
 
 // stagePlanPrefix bọc "brief hướng đi tiếp theo" do đồng sáng tạo tạo ra thành một can thiệp lập kế hoạch giai đoạn, giao Arbiter phán định.

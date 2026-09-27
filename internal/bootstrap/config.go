@@ -82,6 +82,13 @@ type ProviderConfig struct {
 type ModelConfig struct {
 	Name          string `json:"name"`
 	ContextWindow int    `json:"context_window,omitempty"`
+	// Các trường giá do người dùng tự khai (USD trên 1 triệu token), dùng cho model ngoài
+	// OpenRouter hoặc proxy có biểu giá riêng — entry ghim Manual vào registry, refresh
+	// nền không đè. Bỏ trống = theo dữ liệu nguồn (registry/openrouter).
+	InputCostPer1M      float64 `json:"input_cost_per_1m,omitempty"`
+	OutputCostPer1M     float64 `json:"output_cost_per_1m,omitempty"`
+	CacheReadCostPer1M  float64 `json:"cache_read_cost_per_1m,omitempty"`
+	CacheWriteCostPer1M float64 `json:"cache_write_cost_per_1m,omitempty"`
 	// JSONSchema là khai báo ba trạng thái cho xuất có cấu trúc gốc (response_format
 	// json_schema): chưa cấu hình = phán đoán theo năng lực mức mô hình của provider
 	// adapter; true = người dùng khai báo endpoint/mô hình này hỗ trợ (khi yêu cầu bị
@@ -201,7 +208,9 @@ type RoleConfig struct {
 // cấp vai trò, thống nhất dùng mô hình mặc định cấp cao nhất (host.arbiterModel dùng
 // models.Default). import_* là núm vặn cấp mô hình của hàm ngữ nghĩa nhập
 // (docs/import-pipeline.md §13.1): chưa cấu hình thì rơi về architect, sau khi cấu
-// hình có thể chỉ các hàm mang tính cơ giới hơn sang cấp rẻ hơn.
+// hình có thể chỉ các hàm mang tính cơ giới hơn sang cấp rẻ hơn. thinking là model
+// phỏng vấn đồng sáng tác (cocreate.go) — trước đây là role mồ côi không cấu hình
+// được (luôn rơi về Default), nay chính thức mở cấu hình.
 var knownRoles = map[string]bool{
 	"architect":         true,
 	"writer":            true,
@@ -209,6 +218,7 @@ var knownRoles = map[string]bool{
 	"import_segment":    true,
 	"import_analyze":    true,
 	"import_synthesize": true,
+	"thinking":          true,
 }
 
 // Config cấu hình ứng dụng tiểu thuyết.
@@ -320,7 +330,7 @@ func (c *Config) ValidateBase() error {
 			return err
 		}
 		if !knownRoles[role] {
-			return fmt.Errorf("unknown role %q in roles config (valid: architect/writer/editor/import_segment/import_analyze/import_synthesize): %w", role, errs.ErrConfig)
+			return fmt.Errorf("unknown role %q in roles config (valid: architect/writer/editor/import_segment/import_analyze/import_synthesize/thinking): %w", role, errs.ErrConfig)
 		}
 		if rc.Provider == "" || rc.Model == "" {
 			return fmt.Errorf("role %q must have both provider and model: %w", role, errs.ErrConfig)
@@ -398,6 +408,16 @@ func validateProviderConfigText(name string, pc ProviderConfig) error {
 		seenModels[modelName] = true
 		if model.ContextWindow < 0 {
 			return fmt.Errorf("provider %q model %q context_window must be >= 0: %w", name, modelName, errs.ErrConfig)
+		}
+		for field, v := range map[string]float64{
+			"input_cost_per_1m":       model.InputCostPer1M,
+			"output_cost_per_1m":      model.OutputCostPer1M,
+			"cache_read_cost_per_1m":  model.CacheReadCostPer1M,
+			"cache_write_cost_per_1m": model.CacheWriteCostPer1M,
+		} {
+			if v < 0 {
+				return fmt.Errorf("provider %q model %q %s must be >= 0: %w", name, modelName, field, errs.ErrConfig)
+			}
 		}
 	}
 	switch pc.API {
@@ -487,6 +507,50 @@ const (
 	CtxWindowRegistry    ContextWindowSource = "registry"     // trúng đường cơ sở OpenRouter
 	CtxWindowDefault     ContextWindowSource = "default"      // buộc phải (proxy tùy chỉnh/mô hình không rõ)
 )
+
+// ManualPriceEntries dựng các entry registry khai báo tường minh trong config — giá do
+// người dùng tự chịu trách nhiệm (model ngoài OpenRouter, proxy có biểu giá riêng, hợp
+// đồng thị trường khác). Entry mang cờ Manual: refresh nền không được đè. Gồm cả
+// context_window khi khai — qua đường registry này window config cũng đến được ctxpack
+// (build.go đọc models.ResolveContextWindow), trước đây window khai trong config chỉ
+// hiển thị trong TUI mà không ảnh hưởng chiến lược nén ngữ cảnh.
+func (c Config) ManualPriceEntries() []models.ModelEntry {
+	var out []models.ModelEntry
+	for provider, pc := range c.Providers {
+		for _, m := range pc.Models {
+			id := strings.TrimSpace(m.Name)
+			if id == "" {
+				continue
+			}
+			e := models.ModelEntry{Provider: provider, ID: id, Manual: true}
+			declared := false
+			if m.InputCostPer1M > 0 {
+				e.InputCostPer1M = m.InputCostPer1M
+				declared = true
+			}
+			if m.OutputCostPer1M > 0 {
+				e.OutputCostPer1M = m.OutputCostPer1M
+				declared = true
+			}
+			if m.CacheReadCostPer1M > 0 {
+				e.CacheReadCostPer1M = m.CacheReadCostPer1M
+				declared = true
+			}
+			if m.CacheWriteCostPer1M > 0 {
+				e.CacheWriteCostPer1M = m.CacheWriteCostPer1M
+				declared = true
+			}
+			if m.ContextWindow > 0 {
+				e.ContextWindow = m.ContextWindow
+				declared = true
+			}
+			if declared {
+				out = append(out, e)
+			}
+		}
+	}
+	return out
+}
 
 // ResolveContextWindow phân tích cửa sổ hiệu dụng dùng cho nén ngữ cảnh, theo ưu tiên:
 //  1. providers.<provider>.models[].context_window

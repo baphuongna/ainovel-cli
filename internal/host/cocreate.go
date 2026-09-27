@@ -84,11 +84,14 @@ const (
 	tagSuggestions = "suggestions"
 )
 
-func coCreateStream(ctx context.Context, models *bootstrap.ModelSet, sessions *store.SessionStore, sysPrompt string, history []CoCreateMessage, onProgress func(kind, text string)) (reply CoCreateReply, err error) {
+func coCreateStream(ctx context.Context, models *bootstrap.ModelSet, sessions *store.SessionStore, sysPrompt string, history []CoCreateMessage, onProgress func(kind, text string), record func(agentName, task string, msg agentcore.AgentMessage)) (reply CoCreateReply, err error) {
 	if len(history) == 0 {
 		return CoCreateReply{}, fmt.Errorf("cocreate history is empty")
 	}
 
+	// Role "thinking" là model phục vụ phỏng vấn đồng sáng tác (mặc định rơi về Default,
+	// cấu hình được qua roles.thinking). Trước đây đường này không ghi sổ usage — chi phí
+	// phỏng vấn vô hình với meta/usage.json và ngân sách; nay ghi qua callback record.
 	model := models.ForRole("thinking")
 
 	msgs := []agentcore.Message{agentcore.SystemMsg(sysPrompt)}
@@ -151,6 +154,9 @@ func coCreateStream(ctx context.Context, models *bootstrap.ModelSet, sessions *s
 				onProgress(CoCreateProgressReply, extractReplyPreview(raw.String()))
 			}
 		case agentcore.StreamEventDone:
+			if record != nil {
+				record("cocreate", "", ev.Message)
+			}
 			if !streamed {
 				raw.WriteString(ev.Message.TextContent())
 			}

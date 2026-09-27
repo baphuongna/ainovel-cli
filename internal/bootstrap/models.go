@@ -12,6 +12,7 @@ import (
 	"github.com/voocel/agentcore/llm"
 	"github.com/voocel/ainovel-cli/internal/errs"
 	"github.com/voocel/ainovel-cli/internal/llmcontract"
+	"github.com/voocel/ainovel-cli/internal/models"
 )
 
 // FailoverEvent biểu thị một lần chuyển provider tường minh.
@@ -540,7 +541,9 @@ func (m *failoverModel) pickFallback(current modelTarget, err error, requireJSON
 		targets = m.set.fallbackTargets(m.role)
 	}
 	for _, target := range targets {
-		if target.provider == current.provider && target.name == current.name {
+		// Bỏ qua đích trùng model hiện tại, kể cả khác bút danh ngày (claude-sonnet-4 so với
+		// claude-sonnet-4-20250514 là cùng model — chuyển sang nó chỉ đốt thêm một request vô ích).
+		if target.provider == current.provider && models.SameModelID(target.name, current.name) {
 			continue
 		}
 		if target.model == nil {

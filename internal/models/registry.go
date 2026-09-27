@@ -20,6 +20,9 @@ type ModelEntry struct {
 	OutputCostPer1M     float64 `json:"output_cost_per_1m"`     // Giá đầu ra
 	CacheReadCostPer1M  float64 `json:"cache_read_cost_per_1m"` // Giá đọc cache
 	CacheWriteCostPer1M float64 `json:"cache_write_cost_per_1m"`
+	// Manual đánh dấu entry do người dùng khai báo tường minh trong config (model ngoài
+	// OpenRouter, proxy có biểu giá riêng): refresh nền KHÔNG được đè các trường của nó.
+	Manual bool `json:"manual,omitempty"`
 }
 
 // ModelRegistry lưu các model đã biết, hỗ trợ phân giải mờ và gộp dữ liệu lúc runtime.
@@ -100,7 +103,7 @@ func (r *ModelRegistry) Resolve(pattern string) (*ModelEntry, bool) {
 
 	best := candidates[0]
 	for _, i := range candidates[1:] {
-		if !hasDatedSuffix(r.models[i].ID) && hasDatedSuffix(r.models[best].ID) {
+		if substringResolveBetter(r.models[i], r.models[best], normalized) {
 			best = i
 		}
 	}
@@ -151,21 +154,28 @@ func (r *ModelRegistry) MergeModels(fetched []ModelEntry) {
 	for _, f := range fetched {
 		key := strings.ToLower(f.Provider + "/" + f.ID)
 		if i, ok := idx[key]; ok {
+			existing := &r.models[i]
+			// Entry do người dùng khai (Manual) là sự thật theo hợp đồng của họ — dữ liệu
+			// nguồn (OpenRouter) không được đè; chỉ entry Manual mới cập nhật được Manual.
+			if existing.Manual && !f.Manual {
+				continue
+			}
 			if f.InputCostPer1M > 0 || f.OutputCostPer1M > 0 {
-				r.models[i].InputCostPer1M = f.InputCostPer1M
-				r.models[i].OutputCostPer1M = f.OutputCostPer1M
-				r.models[i].CacheReadCostPer1M = f.CacheReadCostPer1M
-				r.models[i].CacheWriteCostPer1M = f.CacheWriteCostPer1M
+				existing.InputCostPer1M = f.InputCostPer1M
+				existing.OutputCostPer1M = f.OutputCostPer1M
+				existing.CacheReadCostPer1M = f.CacheReadCostPer1M
+				existing.CacheWriteCostPer1M = f.CacheWriteCostPer1M
 			}
 			if f.ContextWindow > 0 {
-				r.models[i].ContextWindow = f.ContextWindow
+				existing.ContextWindow = f.ContextWindow
 			}
 			if f.MaxTokens > 0 {
-				r.models[i].MaxTokens = f.MaxTokens
+				existing.MaxTokens = f.MaxTokens
 			}
 			if f.Name != "" {
-				r.models[i].Name = f.Name
+				existing.Name = f.Name
 			}
+			existing.Manual = existing.Manual || f.Manual
 		} else {
 			r.models = append(r.models, f)
 			idx[key] = len(r.models) - 1
