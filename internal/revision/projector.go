@@ -4,7 +4,6 @@ import (
 	"fmt"
 	"slices"
 	"strings"
-	"unicode/utf8"
 
 	"github.com/voocel/ainovel-cli/internal/chapterfacts"
 	"github.com/voocel/ainovel-cli/internal/domain"
@@ -206,7 +205,7 @@ func (p *Projector) updateProgress(records []domain.ChapterRecord) error {
 	progress.HookHistory = nil
 	progress.StrandHistory = nil
 	for _, record := range records {
-		count := utf8.RuneCountInString(record.Content)
+		count := domain.WordCount(record.Content)
 		progress.ChapterWordCounts[record.Chapter] = count
 		progress.TotalWordCount += count
 		setChapterHistory(&progress.HookHistory, record.Chapter, record.Facts.HookType)

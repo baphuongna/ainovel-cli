@@ -104,3 +104,46 @@ func TestCloseWaitsForRegisteredAsyncWork(t *testing.T) {
 		t.Fatal("Close did not return after async work finished")
 	}
 }
+
+// v2→v3: sách tiếng Việt đang viết dở có ChapterWordCounts đếm theo rune phải được tính lại
+// theo từ, sách tiếng Trung giữ nguyên.
+func TestUpgradeProjectRecountsVietnameseWords(t *testing.T) {
+	dir := t.TempDir()
+	st := storepkg.NewStore(dir)
+	if err := st.Init(); err != nil {
+		t.Fatalf("Init: %v", err)
+	}
+	if err := st.SaveProjectFormatVersion(2); err != nil {
+		t.Fatalf("SaveProjectFormatVersion: %v", err)
+	}
+	vi := "Hắn chậm rãi bước qua cánh cổng đá."
+	zh := "他缓缓走过石门。"
+	if err := st.Drafts.SaveFinalChapter(1, vi); err != nil {
+		t.Fatal(err)
+	}
+	if err := st.Drafts.SaveFinalChapter(2, zh); err != nil {
+		t.Fatal(err)
+	}
+	legacy := map[int]int{1: len([]rune(vi)), 2: len([]rune(zh))}
+	if err := st.Progress.Save(&domain.Progress{
+		CompletedChapters: []int{1, 2},
+		ChapterWordCounts: legacy,
+		TotalWordCount:    legacy[1] + legacy[2],
+	}); err != nil {
+		t.Fatal(err)
+	}
+
+	if err := upgradeProject(st); err != nil {
+		t.Fatalf("upgradeProject: %v", err)
+	}
+	p, err := st.Progress.Load()
+	if err != nil {
+		t.Fatal(err)
+	}
+	if p.ChapterWordCounts[1] != 8 || p.ChapterWordCounts[2] != legacy[2] || p.TotalWordCount != 8+legacy[2] {
+		t.Errorf("counts = %+v total=%d", p.ChapterWordCounts, p.TotalWordCount)
+	}
+	if v, _ := st.LoadProjectFormatVersion(); v != storepkg.CurrentProjectFormatVersion {
+		t.Errorf("format version = %d", v)
+	}
+}

@@ -75,7 +75,7 @@ func (s *DraftStore) LoadChapterContent(chapter int) (string, int, error) {
 		return "", 0, err
 	}
 	if draft != "" {
-		return draft, utf8.RuneCountInString(draft), nil
+		return draft, domain.WordCount(draft), nil
 	}
 	return "", 0, nil
 }

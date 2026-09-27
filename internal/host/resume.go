@@ -2,6 +2,7 @@ package host
 
 import (
 	"encoding/json"
+	"errors"
 	"fmt"
 	"log/slog"
 	"os"
@@ -29,6 +30,10 @@ func upgradeProject(st *storepkg.Store) error {
 				return fmt.Errorf("Nâng cấp dữ liệu dự án v%d→v%d: %w", version, next, err)
 			}
 			if err := revision.MigrateLegacyBaseline(st); err != nil {
+				return fmt.Errorf("Nâng cấp dữ liệu dự án v%d→v%d: %w", version, next, err)
+			}
+		case 2:
+			if err := recountChapterWords(st); err != nil {
 				return fmt.Errorf("Nâng cấp dữ liệu dự án v%d→v%d: %w", version, next, err)
 			}
 		default:
@@ -225,4 +230,43 @@ func describeArcEndLabel(store *storepkg.Store, progress *domain.Progress) (stri
 		return fmt.Sprintf("Khôi phục: chờ quyết định quyển tiếp theo (cuối V%d)", vol), nil
 	}
 	return "", nil
+}
+
+// recountChapterWords tính lại ChapterWordCounts / TotalWordCount của mọi chương đã hoàn thành
+// theo domain.WordCount. Trước v3 độ dài luôn đếm theo rune; sách tiếng Việt đang viết dở sẽ
+// có chương cũ (rune) lẫn chương mới (từ), khiến /diag WordCountAnomaly báo nhầm chương mới
+// "ngắn bất thường". Sách tiếng Trung không đổi số liệu (WordCount vẫn đếm rune cho văn chữ Hán).
+func recountChapterWords(st *storepkg.Store) error {
+	progress, err := st.Progress.Load()
+	if err != nil {
+		return fmt.Errorf("đọc tiến độ: %w", err)
+	}
+	if progress == nil || len(progress.CompletedChapters) == 0 {
+		return nil
+	}
+	counts := make(map[int]int, len(progress.CompletedChapters))
+	total := 0
+	changed := false
+	for _, ch := range progress.CompletedChapters {
+		text, err := st.Drafts.LoadChapterText(ch)
+		if err != nil && !errors.Is(err, os.ErrNotExist) {
+			return fmt.Errorf("đọc chương %d: %w", ch, err)
+		}
+		n := domain.WordCount(text)
+		if n == 0 {
+			// Không đọc được chính văn (file bị xóa tay…): giữ số cũ thay vì ghi 0.
+			n = progress.ChapterWordCounts[ch]
+		}
+		counts[ch] = n
+		total += n
+		if progress.ChapterWordCounts[ch] != n {
+			changed = true
+		}
+	}
+	if !changed {
+		return nil
+	}
+	progress.ChapterWordCounts = counts
+	progress.TotalWordCount = total
+	return st.Progress.Save(progress)
 }

@@ -2,7 +2,6 @@ package domain
 
 import (
 	"fmt"
-	"unicode/utf8"
 )
 
 // ReviewInterval khoảng xem xét toàn cục (kích hoạt mỗi N chương).
@@ -25,9 +24,4 @@ func ShouldArcReview(isArcEnd, isVolumeEnd bool, volume, arc int) (bool, string)
 		return true, fmt.Sprintf("kết thúc tập %d, cung %d, kích hoạt xem xét cấp cung", volume, arc)
 	}
 	return false, ""
-}
-
-// WordCount đếm số ký tự theo rune.
-func WordCount(content string) int {
-	return utf8.RuneCountInString(content)
 }

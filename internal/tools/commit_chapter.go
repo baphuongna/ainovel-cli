@@ -9,7 +9,6 @@ import (
 	"slices"
 	"strings"
 	"time"
-	"unicode/utf8"
 
 	"github.com/voocel/agentcore/schema"
 	"github.com/voocel/ainovel-cli/internal/chapterfacts"
@@ -233,7 +232,7 @@ func (t *CommitChapterTool) Execute(_ context.Context, args json.RawMessage) (js
 	// Tiêu đề do engine render: model hay thiếu dòng tiêu đề, viết sai cấp bậc hoặc giữ số chương sai từ giai đoạn hoạch định;
 	// số chương và dấu hai chấm luôn do engine đóng theo ngôn ngữ tác phẩm đang cài trong store.
 	content = domain.ApplyChapterHeading(content, a.Title, a.Chapter, t.store.Language())
-	wordCount := utf8.RuneCountInString(content)
+	wordCount := domain.WordCount(content)
 
 	var pending domain.PendingCommit
 	if existingPending != nil {
@@ -575,7 +574,7 @@ func (t *CommitChapterTool) executeRewriteCommit(a commitArgs, progress *domain.
 		return nil, fmt.Errorf("bản nộp viết lại của chương %d thiếu draft_content, không thể khôi phục an toàn: %w", chapter, errs.ErrToolConflict)
 	}
 	content = domain.ApplyChapterHeading(content, a.Title, chapter, t.store.Language())
-	wordCount := utf8.RuneCountInString(content)
+	wordCount := domain.WordCount(content)
 
 	// 2. Nội dung hoặc tiêu đề phải có ít nhất một cái thay đổi; đánh bóng tiêu đề không cần ngụy tạo thay đổi nội dung.
 	if !recovering {

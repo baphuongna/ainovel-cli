@@ -41,8 +41,9 @@ type Store struct {
 }
 
 const (
-	LegacyProjectFormatVersion  = 1
-	CurrentProjectFormatVersion = 2
+	LegacyProjectFormatVersion = 1
+	// v3: ChapterWordCounts của sách chữ Latin (tiếng Việt) chuyển từ đếm rune sang đếm từ.
+	CurrentProjectFormatVersion = 3
 	projectFormatPath           = "meta/format.json"
 )
 
