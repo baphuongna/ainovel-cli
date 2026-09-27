@@ -4,7 +4,7 @@
 > 日期：2026-07-15
 > 目标：让外部小说导入既能持续获得模型能力升级的收益，又具备全文不丢失、失败可诊断、崩溃可恢复和发布可验证的工程保证。
 > 修订：SourceUnit 顺序按 `(Line, Part)` 数值序（§7.3/§8.3）；截断前缀打捞降级为可后置的效率优化并要求可观测（§9.5/§13.3/§19）；语义函数模型档位开放为旋钮（§13.1/§17）。
-> 修订 2026-07-16：模型档位旋钮落地为 roles 配置 `import_segment/import_analyze/import_synthesize`（§13.1）；自然语言重切分落地为 `--guide` 与工作区 `guidance.txt` 语义输入（§18.3）；语义失败统一保存原始响应到 failures/（§14.2）；切分确认支持面板内 `y` 一次性放行（§8.4）；未完成导入在启动时主动提示（§18.2）。JSON Schema 模式（§13.2 第 1 级）暂未实现，标记 TODO 待与全仓其它模型调用点统一改造。
+> 修订 2026-07-16：模型档位旋钮落地为 roles 配置 `import_segment/import_analyze/import_synthesize`（§13.1）；自然语言重切分落地为 `--guide` 与工作区 `guidance.txt` 语义输入（§18.3）；语义失败统一保存原始响应到 failures/（§14.2）；切分确认支持面板内 `y` 一次性放行（§8.4）；未完成导入在启动时主动提示（§18.2）。JSON Schema 模式已随全仓统一改造落地：四类导入产物共用 `llmcontract.Execute`，模型支持时发送原生 JSON Schema，否则同一份 Schema 生成 Prompt Contract（见 §13.2，与 arbiter/userrules 同一执行器）。
 
 ## 1. 一句话
 

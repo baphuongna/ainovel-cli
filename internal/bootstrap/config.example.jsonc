@@ -28,6 +28,16 @@
         { "name": "qwen2.5:14b", "context_window": 65536 },
         { "name": "ainovel-qwen", "context_window": 65536 }
       ],
+      // Tự khai giá cho model ngoài OpenRouter / proxy có biểu giá riêng (USD / 1 triệu token).
+      // Entry bị ghim "Manual": refresh giá tự động từ OpenRouter sẽ KHÔNG đè các trường đã khai.
+      // Bỏ trống trường nào thì trường đó vẫn theo dữ liệu nguồn. Ví dụ:
+      // "models": [
+      //   { "name": "my-private-model", "context_window": 262144,
+      //     "input_cost_per_1m": 0.5, "output_cost_per_1m": 1.5,
+      //     "cache_read_cost_per_1m": 0.05, "cache_write_cost_per_1m": 0.625 }
+      // ]
+      // (kể từ bản này context_window khai ở đây cũng ảnh hưởng chiến lược nén ngữ cảnh,
+      // trước đây chỉ hiển thị trong TUI)
       // Thời gian chờ stream rảnh rỗi (Go duration, mặc định "5m"):
       // Với mô hình local chạy trên máy cấu hình vừa phải, có thể đặt "15m" để không bị timeout khi suy luận dài.
       "stream_idle_timeout": "15m"
