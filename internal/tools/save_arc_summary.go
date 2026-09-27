@@ -175,7 +175,7 @@ func (t *SaveArcSummaryTool) arcSummaryReplay(
 	if !reflect.DeepEqual(*existing, summary) ||
 		!slices.Equal(storedSnapshots, snapshots) ||
 		storedRules == nil || !reflect.DeepEqual(*storedRules, rules) {
-		return false, fmt.Errorf("Tóm tắt cung %d của quyển %d đã tồn tại nhưng tác phẩm liên kết khác nhau, từ chối ghi đè: %w", summary.Volume, summary.Arc, errs.ErrToolConflict)
+		return false, fmt.Errorf("Tóm tắt tập %d, cung %d đã tồn tại nhưng tác phẩm liên kết khác nhau, từ chối ghi đè: %w", summary.Volume, summary.Arc, errs.ErrToolConflict)
 	}
 	return true, nil
 }

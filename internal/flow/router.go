@@ -285,7 +285,7 @@ func Route(s State) *Instruction {
 		case b.NeedsExpansion && b.NextArc > 0:
 			return &Instruction{
 				Agent:  "architect_long",
-				Task:   fmt.Sprintf("Mở rộng cung %d của tập %d (save_foundation type=expand_arc)", b.NextVolume, b.NextArc),
+				Task:   fmt.Sprintf("Mở rộng tập %d, cung %d (save_foundation type=expand_arc)", b.NextVolume, b.NextArc),
 				Reason: "Khung cung kế tiếp chờ mở rộng",
 			}
 		case b.NeedsNewVolume:

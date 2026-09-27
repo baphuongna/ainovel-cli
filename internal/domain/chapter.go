@@ -19,10 +19,10 @@ func ShouldReview(completedCount int) (bool, string) {
 // ShouldArcReview ở chế độ truyện dài xác định có cần xem xét cấp cung/cấp tập không.
 func ShouldArcReview(isArcEnd, isVolumeEnd bool, volume, arc int) (bool, string) {
 	if isVolumeEnd {
-		return true, fmt.Sprintf("kết thúc cung %d của tập %d (kết thúc tập), kích hoạt xem xét cấp cung + cấp tập", volume, arc)
+		return true, fmt.Sprintf("kết thúc tập %d, cung %d (kết thúc tập), kích hoạt xem xét cấp cung + cấp tập", volume, arc)
 	}
 	if isArcEnd {
-		return true, fmt.Sprintf("kết thúc cung %d của tập %d, kích hoạt xem xét cấp cung", volume, arc)
+		return true, fmt.Sprintf("kết thúc tập %d, cung %d, kích hoạt xem xét cấp cung", volume, arc)
 	}
 	return false, ""
 }
