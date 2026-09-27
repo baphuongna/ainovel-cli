@@ -1,6 +1,10 @@
 services:
   ainovel:
-    image: ghcr.io/voocel/ainovel-cli:latest
+    # Tên image cục bộ riêng cho fork: không trùng với image upstream trên ghcr.io,
+    # nên `docker compose pull` hay máy chưa build sẽ không kéo nhầm bản tiếng Trung.
+    # Dùng image phát hành sẵn của fork: đổi thành ghcr.io/baphuongna/ainovel-cli:latest.
+    image: ainovel-cli-vi:local
+    pull_policy: build
     build:
       context: .
     volumes:

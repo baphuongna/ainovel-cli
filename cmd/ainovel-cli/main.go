@@ -21,6 +21,12 @@ var (
 	version = "dev"
 	commit  = "unknown"
 	date    = "unknown"
+
+	// updateRepo là repo GitHub mà lệnh `ainovel-cli update` tải bản phát hành về.
+	// Mặc định trỏ về fork tiếng Việt: trỏ về upstream (voocel/ainovel-cli) sẽ ghi đè
+	// binary Việt hóa bằng bản tiếng Trung. Fork khác có thể đổi lúc build:
+	//   go build -ldflags "-X main.updateRepo=<owner>/<repo>" ./cmd/ainovel-cli
+	updateRepo = "baphuongna/ainovel-cli"
 )
 
 // headlessMode ghi nhận chế độ khởi động headless.
@@ -197,7 +203,7 @@ func versionInfo() buildversion.Info {
 func runSelfUpdate(target string) error {
 	info := versionInfo()
 	result, err := buildversion.Update(context.Background(), buildversion.UpdateOptions{
-		Repo:           "voocel/ainovel-cli",
+		Repo:           updateRepo,
 		BinaryName:     "ainovel-cli",
 		TargetVersion:  target,
 		CurrentVersion: info.Version,
