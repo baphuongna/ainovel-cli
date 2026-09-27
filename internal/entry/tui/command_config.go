@@ -13,6 +13,7 @@ import (
 	"github.com/charmbracelet/lipgloss"
 	"github.com/voocel/ainovel-cli/internal/bootstrap"
 	"github.com/voocel/ainovel-cli/internal/host"
+	"github.com/voocel/ainovel-cli/internal/styles"
 )
 
 type configStep int
@@ -25,6 +26,7 @@ const (
 	configStepProtocol
 	configStepAPI
 	configStepModels
+	configStepStyle
 )
 
 const (
@@ -74,6 +76,10 @@ type modelConfigState struct {
 	editingField    string
 	baseline        *modelConfigBaseline
 
+	// style là thể loại truyện (key bền vững của internal/styles, ví dụ "wuxia"),
+	// cấu hình toàn cục lưu ngay khi chọn chứ không đi theo bản nháp provider.
+	style string
+
 	modelOrigins []string
 	modelColumn  int
 	editModelIdx int
@@ -82,6 +88,16 @@ type modelConfigState struct {
 
 func newModelConfigState(rt *host.Host) *modelConfigState {
 	state := &modelConfigState{snapshot: rt.ModelConfiguration(), editModelIdx: -1}
+	if cfg, err := bootstrap.LoadConfig(); err != nil {
+		// File cấu hình hỏng không chặn /config: vẫn sửa được provider/model, nhưng nói rõ
+		// style hiển thị có thể lệch cho tới khi file được sửa.
+		state.style = "default"
+		state.message = "Không đọc được cấu hình thể loại: " + err.Error()
+	} else if key := strings.TrimSpace(cfg.Style); key != "" {
+		state.style = key
+	} else {
+		state.style = "default"
+	}
 	state.buildProviderMenus()
 	return state
 }
@@ -225,6 +241,7 @@ func (s *modelConfigState) hubFields() []hubField {
 		base = "Mặc định"
 	}
 	fields = append(fields, hubField{"baseurl", "Base URL", base})
+	fields = append(fields, hubField{"style", "Thể loại", s.styleLabel()})
 	fields = append(fields, hubField{"models", "Model", fmt.Sprintf("%d model", len(s.models))})
 	testModel := s.testModelName()
 	if testModel == "" {
@@ -249,6 +266,40 @@ func (s *modelConfigState) testModelName() string {
 
 func (s *modelConfigState) isOpenAIEndpoint() bool {
 	return s.providerType == "openai" || (s.providerType == "" && s.provider == "openai")
+}
+
+// styleLabel trả nhãn hiển thị cho style hiện tại: ưu tiên nhãn tiếng Việt từ registry
+// (không lộ key thô như "wuxia"); key lạ của config cũ thì hiển thị key thô thay vì che
+// giấu cấu hình người dùng; rỗng hiển thị "Chưa đặt" theo mẫu "Chưa có model".
+func (s *modelConfigState) styleLabel() string {
+	if label := styles.LabelFor(s.style); label != "" {
+		return label
+	}
+	if s.style != "" {
+		return s.style
+	}
+	return "Chưa đặt"
+}
+
+// styleOptionIndex trả vị trí của key trong styles.StyleOptions để màn chọn thể loại
+// mở với con trỏ đứng tại lựa chọn hiện có; key lạ thì về đầu ("Chung").
+func styleOptionIndex(key string) int {
+	for i, opt := range styles.StyleOptions {
+		if opt.Key == key {
+			return i
+		}
+	}
+	return 0
+}
+
+// styleChoiceLabels ghép nhãn tiếng Việt và mô tả của từng style thành dòng chọn,
+// ví dụ "Võ hiệp / Tu tiên — Võ công, tu tiên, kiếm hiệp."
+func styleChoiceLabels() []string {
+	labels := make([]string, len(styles.StyleOptions))
+	for i, opt := range styles.StyleOptions {
+		labels[i] = opt.Label + " — " + opt.Description
+	}
+	return labels
 }
 
 func (s *modelConfigState) keyStatus() string {
@@ -287,6 +338,9 @@ func (s *modelConfigState) enterHubField(id string) (save bool, cmd tea.Cmd) {
 		s.step = configStepModels
 		s.cursor = 0
 		s.modelColumn = 0
+	case "style":
+		s.step = configStepStyle
+		s.cursor = styleOptionIndex(s.style)
 	case "test":
 		return false, nil
 	case "save":
@@ -369,7 +423,7 @@ func (s *modelConfigState) escapeBack() (configStep, bool) {
 		return configStepProvider, true
 	case configStepCustomName:
 		return configStepAddPicker, true
-	case configStepProtocol, configStepAPI, configStepModels:
+	case configStepProtocol, configStepAPI, configStepModels, configStepStyle:
 		return configStepHub, true
 	default:
 		return 0, false
@@ -520,13 +574,40 @@ func (s *modelConfigState) draft() host.ModelConfigurationDraft {
 
 type modelConfigSavedMsg struct{ err error }
 
-type modelConfigConnectionMsg struct {
-	model string
-	err   error
-}
+type styleSavedMsg struct{ err error }
 
 func saveModelConfiguration(rt *host.Host, draft host.ModelConfigurationDraft) tea.Cmd {
 	return func() tea.Msg { return modelConfigSavedMsg{err: rt.ConfigureModels(draft)} }
+}
+
+// saveStyleConfiguration ghi style vào file cấu hình hiệu lực. Tải cấu hình mới ngay trước
+// khi ghi để không đè mất thay đổi khác đã lưu từ lúc mở /config; TUI chỉ giữ key style,
+// không ôm cả cấu hình (chứa API key) trong bộ nhớ — đúng tinh thần redact của snapshot.
+func saveStyleConfiguration(styleKey string) tea.Cmd {
+	return func() tea.Msg {
+		cfg, err := bootstrap.LoadConfig()
+		if err != nil {
+			return styleSavedMsg{err: err}
+		}
+		cfg.Style = styleKey
+		return styleSavedMsg{err: bootstrap.SaveConfig(bootstrap.EffectiveConfigPath(), cfg)}
+	}
+}
+
+// styleHubFieldIndex trả vị trí dòng Thể loại trong hub để con trỏ quay về đúng dòng
+// vừa chỉnh sau khi chọn xong (hubFieldIndex tổng quát nằm ở file test).
+func styleHubFieldIndex(fields []hubField) int {
+	for i, f := range fields {
+		if f.id == "style" {
+			return i
+		}
+	}
+	return 0
+}
+
+type modelConfigConnectionMsg struct {
+	model string
+	err   error
 }
 
 func testModelConnection(ctx context.Context, rt *host.Host, draft host.ModelConfigurationDraft, model string) tea.Cmd {
@@ -685,6 +766,18 @@ func (m Model) handleModelConfigKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 			state.step = configStepHub
 			state.cursor = 0
 		}
+	case configStepStyle:
+		moveConfigCursor(state, msg, len(styles.StyleOptions))
+		if msg.Type == tea.KeyEnter && state.cursor >= 0 && state.cursor < len(styles.StyleOptions) {
+			// Thể loại là cấu hình toàn cục: lưu thẳng vào file cấu hình ngay khi chọn,
+			// không trộn vào bản nháp provider chờ "Lưu cấu hình".
+			state.style = styles.StyleOptions[state.cursor].Key
+			state.step = configStepHub
+			state.cursor = styleHubFieldIndex(state.hubFields())
+			state.saving = true
+			state.message = "Đang lưu thể loại: " + state.styleLabel() + "..."
+			return m, saveStyleConfiguration(state.style)
+		}
 	case configStepModels:
 		state.ensureModelOrigins()
 		if state.editingField != "" {
@@ -823,6 +916,9 @@ func renderModelConfigModal(width int, state *modelConfigState) string {
 	case configStepAPI:
 		lines = append(lines, configHeading("OpenAI Endpoint"))
 		lines = append(lines, renderConfigChoices([]string{"chat · /v1/chat/completions", "responses · /v1/responses"}, state.cursor, contentW, 8)...)
+	case configStepStyle:
+		lines = append(lines, configHeading("Chọn thể loại truyện"))
+		lines = append(lines, renderConfigChoices(styleChoiceLabels(), state.cursor, contentW, 8)...)
 	case configStepModels:
 		lines = append(lines, configHeading("Quản lý danh sách Model"))
 		lines = append(lines, renderModelConfigRows(state, contentW)...)
@@ -835,7 +931,8 @@ func renderModelConfigModal(width int, state *modelConfigState) string {
 
 	if state.message != "" {
 		color := colorError
-		if strings.HasPrefix(state.message, "Kiểm tra kết nối thành công") || strings.HasPrefix(state.message, "Kết nối thành công") {
+		if strings.HasPrefix(state.message, "Kiểm tra kết nối thành công") || strings.HasPrefix(state.message, "Kết nối thành công") ||
+			strings.HasPrefix(state.message, "Đã lưu") {
 			color = colorSuccess
 		} else if state.saving || state.testing || strings.HasPrefix(state.message, "Đã chọn") ||
 			strings.HasPrefix(state.message, "API Key đã") || strings.HasPrefix(state.message, "Đang") {

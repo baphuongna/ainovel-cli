@@ -49,14 +49,14 @@ func TestAnalyzeSourceUsesNativeSchema(t *testing.T) {
 		t.Fatalf("AnalyzeSource: %v", err)
 	}
 	if report.Summary == "" {
-		t.Fatal("summary 为空")
+		t.Fatal("summary rỗng")
 	}
 	format := model.config.ResponseFormat
 	if format == nil || format.JSONSchema == nil || format.JSONSchema.Name != sourceReportContract.Name {
 		t.Fatalf("response format = %#v", format)
 	}
 	if strings.Contains(model.messages[0].TextContent(), "<output-json-schema>") {
-		t.Fatalf("native prompt 不应注入 schema: %s", model.messages[0].TextContent())
+		t.Fatalf("native prompt không được chèn schema: %s", model.messages[0].TextContent())
 	}
 }
 
@@ -70,7 +70,7 @@ func TestAnalyzeSourcePromptModeRepairsMissingRequiredFields(t *testing.T) {
 		t.Fatalf("AnalyzeSource: %v", err)
 	}
 	if report.Summary != "修正后的摘要" || model.calls.Load() != 2 {
-		t.Fatalf("缺字段后应反馈自愈: report=%+v calls=%d", report, model.calls.Load())
+		t.Fatalf("Sau khi thiếu trường phải phản hồi tự sửa: report=%+v calls=%d", report, model.calls.Load())
 	}
 }
 

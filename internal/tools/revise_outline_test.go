@@ -160,7 +160,7 @@ func TestReviseOutlinePreservesOtherLayeredArcs(t *testing.T) {
 		t.Fatalf("layered revise result = %#v", result)
 	}
 	if _, exists := result["total_chapters"]; exists {
-		t.Fatalf("layered revise 不得暴露固定总章数: %#v", result)
+		t.Fatalf("layered revise không được tiết lộ tổng số chương cố định: %#v", result)
 	}
 
 	layered, err := s.Outline.LoadLayeredOutline()

@@ -37,7 +37,7 @@ func TestCastMergeAppearances_NewEntries(t *testing.T) {
 			t.Errorf("expected BriefRole 客栈老板 for 老周, got %q", e.BriefRole)
 		}
 		if e.Name == "阿云" && e.BriefRole != "" {
-			t.Errorf("阿云 没有 intro，BriefRole 应为空，得到 %q", e.BriefRole)
+			t.Errorf("阿云 không có intro, BriefRole phải để trống, nhận được %q", e.BriefRole)
 		}
 	}
 }
@@ -69,7 +69,7 @@ func TestCastMergeAppearances_IsIdempotent(t *testing.T) {
 	if err := s.Cast.MergeAppearances(5, []string{"老周"}, nil, nil); err != nil {
 		t.Fatalf("first merge: %v", err)
 	}
-	// 同一章 commit 重复触发（崩溃恢复或重写场景）
+	// commit lặp của cùng một chương (kịch bản khôi phục sau crash hoặc viết lại)
 	if err := s.Cast.MergeAppearances(5, []string{"老周"}, nil, nil); err != nil {
 		t.Fatalf("second merge: %v", err)
 	}
@@ -98,11 +98,11 @@ func TestCastMergeAppearances_FiltersCoreCharacters(t *testing.T) {
 
 func TestCastMergeAppearances_BackfillsBriefRole(t *testing.T) {
 	s := newCastTestStore(t)
-	// 第 5 章引入老周但 Writer 忘填 brief_role
+	// Chương 5 giới thiệu nhân vật 老周 nhưng Writer quên điền brief_role
 	if err := s.Cast.MergeAppearances(5, []string{"老周"}, nil, nil); err != nil {
 		t.Fatalf("first merge: %v", err)
 	}
-	// 第 8 章再次出现，Writer 这次补了 brief_role
+	// Chương 8 xuất hiện lại, lần này Writer đã bổ sung brief_role
 	intros := []domain.CastIntro{{Name: "老周", BriefRole: "客栈老板"}}
 	if err := s.Cast.MergeAppearances(8, []string{"老周"}, intros, nil); err != nil {
 		t.Fatalf("second merge: %v", err)
@@ -116,7 +116,7 @@ func TestCastMergeAppearances_BackfillsBriefRole(t *testing.T) {
 
 func TestCastMergeAppearances_NoOverwriteBriefRole(t *testing.T) {
 	s := newCastTestStore(t)
-	// 第 5 章定下 BriefRole=客栈老板
+	// Chương 5 ấn định BriefRole=客栈老板
 	if err := s.Cast.MergeAppearances(5,
 		[]string{"老周"},
 		[]domain.CastIntro{{Name: "老周", BriefRole: "客栈老板"}},
@@ -124,7 +124,7 @@ func TestCastMergeAppearances_NoOverwriteBriefRole(t *testing.T) {
 	); err != nil {
 		t.Fatalf("first merge: %v", err)
 	}
-	// 第 8 章 Writer 错误地传了不同的 BriefRole（不应覆盖）
+	// Chương 8 Writer truyền nhầm BriefRole khác (không được ghi đè)
 	if err := s.Cast.MergeAppearances(8,
 		[]string{"老周"},
 		[]domain.CastIntro{{Name: "老周", BriefRole: "赌坊打手"}},

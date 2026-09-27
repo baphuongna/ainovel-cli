@@ -10,46 +10,49 @@ import (
 	"github.com/voocel/ainovel-cli/internal/llmcontract"
 )
 
-// PlanStartDecision 启动裁定:选规划师并产出(必要时扩充过的)任务文本。
+// PlanStartDecision phán định khởi động: chọn kiến trúc sư và tạo văn bản nhiệm vụ (đã mở rộng nếu cần).
 type PlanStartDecision struct {
 	Planner string `json:"planner"` // architect_long | architect_short
-	Task    string `json:"task"`    // 交给规划师的完整任务(含扩充后的需求)
+	Task    string `json:"task"`    // nhiệm vụ đầy đủ giao cho kiến trúc sư (gồm yêu cầu đã mở rộng)
 	Reason  string `json:"reason"`
 }
 
 func (d *PlanStartDecision) Validate() error {
 	if d.Planner != "architect_long" && d.Planner != "architect_short" {
-		return fmt.Errorf("planner 非法: %q（可选 architect_long / architect_short）", d.Planner)
+		return fmt.Errorf("planner không hợp lệ: %q (chọn architect_long / architect_short)", d.Planner)
 	}
 	if strings.TrimSpace(d.Task) == "" {
-		return fmt.Errorf("task 不能为空")
+		return fmt.Errorf("task không được để trống")
 	}
 	if strings.TrimSpace(d.Reason) == "" {
-		return fmt.Errorf("reason 不能为空")
+		return fmt.Errorf("reason không được để trống")
 	}
 	return nil
 }
 
-// planStartContract 紧邻 PlanStartDecision:字段全 required,planner 是封闭枚举。
+// planStartContract nằm sát PlanStartDecision: mọi trường đều required, planner là enum đóng.
 var planStartContract = llmcontract.Contract{
 	Name:        "arbiter_plan_start",
-	Description: "启动裁定:选规划师并产出完整任务文本",
+	Description: "Phán định khởi động: chọn kiến trúc sư và tạo văn bản nhiệm vụ đầy đủ",
 	Schema: schema.Object(
-		schema.Property("planner", schema.Enum("规划师", "architect_long", "architect_short")).Required(),
-		schema.Property("task", schema.String("交给规划师的完整任务(含扩充后的需求)")).Required(),
-		schema.Property("reason", schema.String("选择理由")).Required(),
+		schema.Property("planner", schema.Enum("kiến trúc sư", "architect_long", "architect_short")).Required(),
+		schema.Property("task", schema.String("nhiệm vụ đầy đủ giao cho kiến trúc sư (gồm yêu cầu đã mở rộng)")).Required(),
+		schema.Property("reason", schema.String("lý do lựa chọn")).Required(),
 	),
 }
 
-// planStartPayload 是 plan_start 的用户负载(事实即输入,无 store 状态——新书)。
+// planStartPayload là payload người dùng của plan_start (chính yêu cầu là đầu vào, không có
+// trạng thái store — sách mới).
 type planStartPayload struct {
 	Requirement string `json:"requirement"`
 	Style       string `json:"style,omitempty"`
 }
 
-// DecidePlanStart 启动裁定:根据用户需求选规划师;需求过短(<20 字)时在 task 里
-// 自主补充差异化方向、目标读者与核心消费点、至少一个非常规钩子。
-// 失败语义:返回 error → 调用方显式报错中止启动(启动期用户在场,报错优于猜测)。
+// DecidePlanStart phán định khởi động: chọn kiến trúc sư theo nhu cầu người dùng; khi nhu cầu
+// quá ngắn (<20 ký tự) thì tự bổ sung vào task hướng khác biệt, độc giả mục tiêu và điểm hấp
+// dẫn cốt lõi, cùng ít nhất một hook phi quy ước.
+// Ngữ nghĩa thất bại: trả về error → bên gọi báo lỗi rõ ràng và dừng khởi động (người dùng
+// hiện diện ở giai đoạn khởi động, báo lỗi tốt hơn đoán mò).
 func DecidePlanStart(ctx context.Context, model agentcore.ChatModel, systemPrompt, requirement, style string) (PlanStartDecision, error) {
 	payload, err := marshalPayload(planStartPayload{Requirement: requirement, Style: style})
 	if err != nil {

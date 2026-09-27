@@ -11,17 +11,17 @@ import (
 	"github.com/voocel/ainovel-cli/internal/domain"
 )
 
-// DraftStore 管理章节构思、草稿和终稿。
+// DraftStore quản lý ý tưởng chương, bản nháp và chính văn bản cuối.
 type DraftStore struct{ io *IO }
 
 func NewDraftStore(io *IO) *DraftStore { return &DraftStore{io: io} }
 
-// SaveChapterPlan 保存章节构思到 drafts/{ch}.plan.json。
+// SaveChapterPlan lưu ý tưởng chương vào drafts/{ch}.plan.json.
 func (s *DraftStore) SaveChapterPlan(plan domain.ChapterPlan) error {
 	return s.io.WriteJSON(fmt.Sprintf("drafts/%02d.plan.json", plan.Chapter), plan)
 }
 
-// LoadChapterPlan 读取章节构思。
+// LoadChapterPlan đọc ý tưởng chương.
 func (s *DraftStore) LoadChapterPlan(chapter int) (*domain.ChapterPlan, error) {
 	var plan domain.ChapterPlan
 	if err := s.io.ReadJSON(fmt.Sprintf("drafts/%02d.plan.json", chapter), &plan); err != nil {
@@ -33,12 +33,12 @@ func (s *DraftStore) LoadChapterPlan(chapter int) (*domain.ChapterPlan, error) {
 	return &plan, nil
 }
 
-// SaveDraft 保存整章草稿到 drafts/{ch}.draft.md。
+// SaveDraft lưu bản nháp cả chương vào drafts/{ch}.draft.md.
 func (s *DraftStore) SaveDraft(chapter int, content string) error {
 	return s.io.WriteMarkdown(fmt.Sprintf("drafts/%02d.draft.md", chapter), content)
 }
 
-// AppendDraft 追加内容到现有草稿（续写模式）。
+// AppendDraft nối thêm nội dung vào bản nháp hiện có (chế độ viết tiếp).
 func (s *DraftStore) AppendDraft(chapter int, content string) error {
 	rel := fmt.Sprintf("drafts/%02d.draft.md", chapter)
 	return s.io.WithWriteLock(func() error {
@@ -56,7 +56,7 @@ func (s *DraftStore) AppendDraft(chapter int, content string) error {
 	})
 }
 
-// LoadDraft 读取整章草稿。
+// LoadDraft đọc bản nháp cả chương.
 func (s *DraftStore) LoadDraft(chapter int) (string, error) {
 	data, err := s.io.ReadFile(fmt.Sprintf("drafts/%02d.draft.md", chapter))
 	if os.IsNotExist(err) {
@@ -68,7 +68,7 @@ func (s *DraftStore) LoadDraft(chapter int) (string, error) {
 	return string(data), nil
 }
 
-// LoadChapterContent 加载章节草稿正文及字数。
+// LoadChapterContent tải nội dung chính của bản nháp chương cùng số chữ.
 func (s *DraftStore) LoadChapterContent(chapter int) (string, int, error) {
 	draft, err := s.LoadDraft(chapter)
 	if err != nil {
@@ -80,12 +80,12 @@ func (s *DraftStore) LoadChapterContent(chapter int) (string, int, error) {
 	return "", 0, nil
 }
 
-// SaveFinalChapter 保存最终章节正文到 chapters/{ch}.md。
+// SaveFinalChapter lưu nội dung chính bản cuối của chương vào chapters/{ch}.md.
 func (s *DraftStore) SaveFinalChapter(chapter int, content string) error {
 	return s.io.WriteMarkdown(fmt.Sprintf("chapters/%02d.md", chapter), content)
 }
 
-// LoadChapterText 读取已提交的终稿原文。
+// LoadChapterText đọc nguyên văn chính văn bản cuối đã nộp.
 func (s *DraftStore) LoadChapterText(chapter int) (string, error) {
 	data, err := s.io.ReadFile(fmt.Sprintf("chapters/%02d.md", chapter))
 	if os.IsNotExist(err) {
@@ -97,7 +97,7 @@ func (s *DraftStore) LoadChapterText(chapter int) (string, error) {
 	return string(data), nil
 }
 
-// LoadChapterRange 读取指定范围的终稿原文片段。
+// LoadChapterRange đọc các đoạn nguyên văn của chính văn bản cuối trong khoảng chỉ định.
 func (s *DraftStore) LoadChapterRange(from, to, maxRunes int) (map[int]string, error) {
 	result := make(map[int]string)
 	for ch := from; ch <= to; ch++ {
@@ -121,8 +121,8 @@ func (s *DraftStore) LoadChapterRange(from, to, maxRunes int) (map[int]string, e
 
 var dialogueRe = regexp.MustCompile(`"[^"]*"`)
 
-// ExtractDialogue 从已提交章节中提取指定角色的对话片段。
-// maxCompletedChapter 由调用方传入，避免跨域依赖。
+// ExtractDialogue trích đoạn hội thoại của nhân vật chỉ định từ các chương đã nộp.
+// maxCompletedChapter do bên gọi truyền vào, tránh phụ thuộc xuyên lĩnh vực.
 func (s *DraftStore) ExtractDialogue(characterName string, aliases []string, maxSamples, maxCompletedChapter int) ([]string, error) {
 	if maxSamples <= 0 {
 		maxSamples = 5
@@ -169,8 +169,8 @@ func (s *DraftStore) ExtractDialogue(characterName string, aliases []string, max
 	return samples, errors.Join(readErrs...)
 }
 
-// ExtractStyleAnchors 从已提交章节中提取代表性段落作为风格锚点。
-// maxCompletedChapter 由调用方传入，避免跨域依赖。
+// ExtractStyleAnchors trích các đoạn tiêu biểu từ các chương đã nộp làm điểm neo phong cách.
+// maxCompletedChapter do bên gọi truyền vào, tránh phụ thuộc xuyên lĩnh vực.
 func (s *DraftStore) ExtractStyleAnchors(maxAnchors, maxCompletedChapter int) ([]string, error) {
 	if maxAnchors <= 0 {
 		maxAnchors = 5

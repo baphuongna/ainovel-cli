@@ -28,8 +28,8 @@ func newModelConfigTestHost(t *testing.T) (*Host, string) {
 	if err != nil {
 		t.Fatalf("new model set: %v", err)
 	}
-	// 落一份初始配置：生产中 configPath 必指向已存在的配置层，SaveProviderConfig
-	// 只补 providers 段、保留其余，seed 后才能真实检验“顶层选择不被改动”。
+	// Ghi một cấu hình ban đầu: trong thực tế configPath phải trỏ tới tầng cấu hình đã tồn tại, SaveProviderConfig
+	// chỉ bù khối providers, giữ phần còn lại; sau seed mới kiểm chứng thật được "lựa chọn tầng trên không bị thay đổi".
 	path := filepath.Join(t.TempDir(), "config.json")
 	if err := bootstrap.SaveConfig(path, cfg); err != nil {
 		t.Fatalf("seed config: %v", err)
@@ -40,27 +40,27 @@ func newModelConfigTestHost(t *testing.T) (*Host, string) {
 	}, path
 }
 
-// 推理强度存储保留原始意图：显式设定后，切模型不得把它钳制降级写回。
+// Lưu trữ mức suy luận giữ ý định gốc: sau khi đặt tường minh, đổi model không được kẹp hạ rồi ghi ngược.
 func TestSetRoleThinkingPreservesIntentAcrossModelSwitch(t *testing.T) {
 	h, _ := newModelConfigTestHost(t)
 	if err := h.SetRoleThinking("writer", "high"); err != nil {
 		t.Fatalf("set thinking: %v", err)
 	}
 	if got := h.cfg.Roles["writer"].ReasoningEffort; got != "high" {
-		t.Fatalf("SetRoleThinking 应原样存 high，得到 %q", got)
+		t.Fatalf("SetRoleThinking phải lưu nguyên văn high, được %q", got)
 	}
-	// 换 writer 的模型：已存的强度意图必须保持 high，钳制只应发生在下发路径。
+	// Đổi model của writer: ý định mức đã lưu phải giữ high, việc kẹp chỉ được xảy ra trên đường phát xuống.
 	if err := h.SwitchModel("writer", "proxy", "old"); err != nil {
 		t.Fatalf("switch: %v", err)
 	}
 	if got := h.cfg.Roles["writer"].ReasoningEffort; got != "high" {
-		t.Fatalf("切模型后 writer thinking 被改写为 %q，应仍是 high", got)
+		t.Fatalf("Sau khi đổi model writer thinking bị ghi thành %q, phải vẫn là high", got)
 	}
 }
 
 func TestConfigureModelsRejectsDeletingReferencedModel(t *testing.T) {
 	h, _ := newModelConfigTestHost(t)
-	// 删掉被 writer 角色引用的 "writer-model"（保留顶层在用的 "old"）应被拒。
+	// Xóa "writer-model" đang được role writer tham chiếu (giữ "old" tầng trên đang dùng) phải bị từ chối.
 	err := h.ConfigureModels(ModelConfigurationDraft{
 		Provider: "proxy", Type: "openai", BaseURL: "https://example.com/v1",
 		Models:       []bootstrap.ModelConfig{{Name: "old"}, {Name: "new"}},
@@ -75,7 +75,7 @@ func TestConfigureModelsRejectsDeletingReferencedModel(t *testing.T) {
 	}
 }
 
-// /config 不再代切默认：删掉顶层正在用的模型必须被拒，让用户先去 /model 切走。
+// /config không còn chuyển thay mặc định: xóa model tầng trên đang dùng phải bị từ chối, để người dùng sang /model chuyển trước.
 func TestConfigureModelsRejectsDeletingCurrentModel(t *testing.T) {
 	h, _ := newModelConfigTestHost(t)
 	err := h.ConfigureModels(ModelConfigurationDraft{
@@ -98,12 +98,12 @@ func TestConfigureModelsPersistsAndHotApplies(t *testing.T) {
 	if err != nil {
 		t.Fatalf("configure: %v", err)
 	}
-	// 顶层选择不被 /config 改动：仍是 proxy/old。
+	// Lựa chọn tầng trên không bị /config đổi: vẫn là proxy/old.
 	provider, model, _ := h.models.CurrentSelection("default")
 	if provider != "proxy" || model != "old" {
 		t.Fatalf("runtime selection mutated = %s/%s", provider, model)
 	}
-	// provider 段热应用：old 的窗口更新为 640000。
+	// Áp dụng nóng khối provider: cửa sổ của old cập nhật thành 640000.
 	if window, source := h.models.ResolveContextWindow("proxy", "old"); window != 640000 || source != bootstrap.CtxWindowModelConfig {
 		t.Fatalf("runtime window = %d %s", window, source)
 	}
@@ -122,8 +122,8 @@ func TestConfigureModelsPersistsAndHotApplies(t *testing.T) {
 	}
 }
 
-// TUI 草稿保存不得丢失 json_schema 三态（prepareProviderDraftLocked 整结构体
-// 往返的回归锁）。
+// Lưu bản nháp TUI không được làm mất ba trạng thái json_schema (regression lock cho
+// prepareProviderDraftLocked khứ hồi toàn struct).
 func TestConfigureModelsPreservesJSONSchemaTriState(t *testing.T) {
 	h, path := newModelConfigTestHost(t)
 	tr := true
@@ -144,10 +144,10 @@ func TestConfigureModelsPreservesJSONSchemaTriState(t *testing.T) {
 	}
 	models := saved.Providers["proxy"].Models
 	if len(models) != 2 || models[0].JSONSchema == nil || !*models[0].JSONSchema {
-		t.Fatalf("json_schema 丢失: %#v", models)
+		t.Fatalf("json_schema bị mất: %#v", models)
 	}
 	if models[1].JSONSchema != nil {
-		t.Fatalf("未配置模型不应臆造三态: %#v", models[1])
+		t.Fatalf("Model chưa cấu hình không được ngụy tạo ba trạng thái: %#v", models[1])
 	}
 }
 
@@ -192,7 +192,7 @@ func TestConfigureModelsDoesNotGuessRenameFromDeleteAndAdd(t *testing.T) {
 		Models: []bootstrap.ModelConfig{{Name: "renamed"}, {Name: "writer-model"}}, APIKeyAction: APIKeyKeep,
 	})
 	if err == nil || !strings.Contains(err.Error(), "default") {
-		t.Fatalf("未显式声明重命名时仍应按删除保护，got %v", err)
+		t.Fatalf("Khi không khai báo đổi tên tường minh vẫn phải bảo vệ theo kiểu xóa, got %v", err)
 	}
 }
 
@@ -204,7 +204,7 @@ func TestModelConfigurationsIncludesReferencedUnlistedModel(t *testing.T) {
 	}
 	models := modelConfigurations(cfg, "proxy", pc)
 	if len(models) != 2 || models[0].Name != "listed" || models[1].Name != "referenced-only" {
-		t.Fatalf("界面与重命名校验应共享完整候选模型列表，got %#v", models)
+		t.Fatalf("Giao diện và kiểm tra đổi tên phải dùng chung danh sách model ứng viên đầy đủ, got %#v", models)
 	}
 }
 
@@ -213,7 +213,7 @@ func TestMaskAPIKeyAndSnapshotNeverExposeFullValue(t *testing.T) {
 		t.Fatalf("MaskAPIKey = %q", got)
 	}
 	if got := MaskAPIKey("short-secret"); got != "******" {
-		t.Fatalf("短 Key 应全部隐藏，得到 %q", got)
+		t.Fatalf("Key ngắn phải ẩn hết, được %q", got)
 	}
 
 	h, _ := newModelConfigTestHost(t)
@@ -223,7 +223,7 @@ func TestMaskAPIKeyAndSnapshotNeverExposeFullValue(t *testing.T) {
 	}
 	provider := snapshot.Providers[0]
 	if provider.APIKeyHint != "******" || strings.Contains(provider.APIKeyHint, "old-secret") {
-		t.Fatalf("snapshot 暴露了完整 API Key: %#v", provider)
+		t.Fatalf("Snapshot phơi nguyên API Key: %#v", provider)
 	}
 }
 
@@ -234,11 +234,11 @@ func TestConfigureModelsRejectsMissingRequiredAPIKeyForUnusedProvider(t *testing
 		Models:       []bootstrap.ModelConfig{{Name: "claude-test"}},
 		APIKeyAction: APIKeyKeep,
 	})
-	if err == nil || !strings.Contains(err.Error(), "必须配置 API Key") {
-		t.Fatalf("未使用但要求凭证的 Provider 也应拒绝空 Key，得到 %v", err)
+	if err == nil || !strings.Contains(err.Error(), "phải cấu hình API Key") {
+		t.Fatalf("Provider chưa dùng nhưng yêu cầu chứng nhiệm cũng phải từ chối Key rỗng, được %v", err)
 	}
 	if _, exists := h.cfg.Providers["anthropic"]; exists {
-		t.Fatal("校验失败后不应修改运行时配置")
+		t.Fatal("Sau khi kiểm tra thất bại không được sửa cấu hình runtime")
 	}
 }
 
@@ -268,14 +268,14 @@ func TestModelConnectionUsesDraftWithoutSaving(t *testing.T) {
 		t.Fatalf("request path = %q", requestPath)
 	}
 	if got := h.cfg.Providers["proxy"].BaseURL; got != originalURL {
-		t.Fatalf("连接测试修改了运行时配置: %q", got)
+		t.Fatalf("Kiểm tra kết nối đã sửa cấu hình runtime: %q", got)
 	}
 	saved, err := bootstrap.LoadConfigFile(path)
 	if err != nil {
 		t.Fatalf("load config: %v", err)
 	}
 	if got := saved.Providers["proxy"].BaseURL; got != originalURL {
-		t.Fatalf("连接测试写入了配置文件: %q", got)
+		t.Fatalf("Kiểm tra kết nối đã ghi vào file cấu hình: %q", got)
 	}
 }
 
@@ -289,7 +289,7 @@ func TestConfigureModelsSuggestsSwitchForNewProvider(t *testing.T) {
 		t.Fatalf("configure backup: %v", err)
 	}
 	event := <-h.events
-	if !strings.Contains(event.Summary, "使用 /model 切换") {
-		t.Fatalf("新增非当前 Provider 后应提示切换，event=%q", event.Summary)
+	if !strings.Contains(event.Summary, "dùng /model để chuyển") {
+		t.Fatalf("Sau khi thêm Provider không phải cái hiện tại phải nhắc chuyển, event=%q", event.Summary)
 	}
 }

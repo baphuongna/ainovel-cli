@@ -5,7 +5,7 @@ import (
 	"strings"
 )
 
-// Phase 表示小说创作阶段。
+// Phase biểu thị giai đoạn sáng tác tiểu thuyết.
 type Phase string
 
 const (
@@ -16,7 +16,7 @@ const (
 	PhaseComplete Phase = "complete"
 )
 
-// FlowState 当前活动流程类型，用于 checkpoint 恢复。
+// FlowState loại luồng đang hoạt động, dùng cho khôi phục checkpoint.
 type FlowState string
 
 const (
@@ -27,7 +27,7 @@ const (
 	FlowSteering  FlowState = "steering"
 )
 
-// PlanningTier 表示作品规划的长度级别。
+// PlanningTier biểu thị cấp độ độ dài quy hoạch tác phẩm.
 type PlanningTier string
 
 const (
@@ -36,49 +36,53 @@ const (
 	PlanningTierLong  PlanningTier = "long"
 )
 
-// Progress 进度追踪，持久化到 meta/progress.json。
+// Progress theo dõi tiến độ, lưu bền xuống meta/progress.json.
 type Progress struct {
 	Phase          Phase `json:"phase"`
 	CurrentChapter int   `json:"current_chapter"`
-	// TotalChapters 在非分层模式是详细大纲章数；在分层模式仅是包含骨架估算的
-	// 内部容量值，用于上下文策略，不代表全书固定总章数。
+	// TotalChapters ở chế độ không phân tầng là số chương của dàn ý chi tiết; ở chế độ phân tầng
+	// chỉ là giá trị dung lượng nội bộ gồm cả ước tính khung xương, dùng cho chiến lược ngữ cảnh,
+	// không đại diện tổng số chương cố định của toàn sách.
 	TotalChapters     int         `json:"total_chapters"`
 	CompletedChapters []int       `json:"completed_chapters"`
 	TotalWordCount    int         `json:"total_word_count"`
-	ChapterWordCounts map[int]int `json:"chapter_word_counts,omitempty"` // 每章字数，支持重写时修正总字数
-	InProgressChapter int         `json:"in_progress_chapter,omitempty"` // 正在写作的章节（场景级恢复）
-	CompletedScenes   []int       `json:"completed_scenes,omitempty"`    // 当前章节已完成的场景编号
-	Flow              FlowState   `json:"flow,omitempty"`                // 当前流程
-	PendingRewrites   []int       `json:"pending_rewrites,omitempty"`    // 待重写章节队列
-	RewriteReason     string      `json:"rewrite_reason,omitempty"`      // 重写原因
-	StrandHistory     []string    `json:"strand_history,omitempty"`      // 按章节顺序记录 dominant_strand
-	HookHistory       []string    `json:"hook_history,omitempty"`        // 按章节顺序记录 hook_type
-	// 长篇分层追踪（仅长篇模式使用，短篇/中篇为零值）
+	ChapterWordCounts map[int]int `json:"chapter_word_counts,omitempty"` // số ký tự từng chương, hỗ trợ sửa tổng số ký tự khi viết lại
+	InProgressChapter int         `json:"in_progress_chapter,omitempty"` // chương đang được viết (khôi phục cấp cảnh)
+	CompletedScenes   []int       `json:"completed_scenes,omitempty"`    // số thứ tự cảnh đã hoàn thành của chương hiện tại
+	Flow              FlowState   `json:"flow,omitempty"`                // luồng hiện tại
+	PendingRewrites   []int       `json:"pending_rewrites,omitempty"`    // hàng đợi chương chờ viết lại
+	RewriteReason     string      `json:"rewrite_reason,omitempty"`      // lý do viết lại
+	StrandHistory     []string    `json:"strand_history,omitempty"`      // ghi lại dominant_strand theo thứ tự chương
+	HookHistory       []string    `json:"hook_history,omitempty"`        // ghi lại hook_type theo thứ tự chương
+	// Theo dõi phân tầng truyện dài (chỉ chế độ truyện dài dùng, truyện ngắn/vừa là giá trị rỗng)
 	CurrentVolume int  `json:"current_volume,omitempty"`
 	CurrentArc    int  `json:"current_arc,omitempty"`
 	Layered       bool `json:"layered,omitempty"`
-	// ReopenedFromComplete 标记本书是经 reopen 从完结态重开进入返工的。返工只改已有章、
-	// 不增减结构，故排空后应按"结构完整即重新完结"放行（避免终卷末伏笔被返工扰动后卡在
-	// writing → 越界续写死循环）；正向写作不置此标记，完结判定保持线索收束的保守语义。
+	// ReopenedFromComplete đánh dấu sách này được mở lại từ trạng thái hoàn tất qua reopen để
+	// vào viết lại. Viết lại chỉ sửa các chương đã có, không thêm bớt cấu trúc, nên sau khi cạn
+	// hàng đợi phải buông theo "cấu trúc đầy đủ tức hoàn tất lại" (tránh phục bút cuối tập bị
+	// nhiễu động bởi viết lại rồi kẹt ở writing → vòng lặp chết viết tiếp vượt giới); viết xuôi
+	// không đặt cờ này, phán xét hoàn tất giữ nguyên ngữ nghĩa thận trọng là thu dây xong hết.
 	ReopenedFromComplete bool `json:"reopened_from_complete,omitempty"`
-	// ReopenCount 记录本书从完结态被重开的累计次数（/reopen 审计事实）。它同时保证
-	// 重开后的再完结与上次完结的 progress.json 内容不同：checkpoint 对同 digest 幂等
-	// 去重，字节相同的再完结不会产生新 checkpoint，StopGuard 会把成功的 complete_book
-	// 误判为空转并升级终止。
+	// ReopenCount ghi số lần tích lũy sách này được mở lại từ trạng thái hoàn tất (sự kiện kiểm
+	// toán /reopen). Nó đồng thời bảo đảm lần hoàn tất sau khi mở lại khác nội dung progress.json
+	// với lần hoàn tất trước: checkpoint khử trùng lặp theo digest, hoàn tất lặp lại có byte
+	// giống nhau sẽ không sinh checkpoint mới, StopGuard sẽ phán nhầm complete_book thành công
+	// là quay vòng chỗ cũ và leo thang chấm dứt.
 	ReopenCount int `json:"reopen_count,omitempty"`
 }
 
-// IsResumable 判断是否可以从断点恢复。
+// IsResumable xác định có thể khôi phục từ checkpoint hay không.
 func (p *Progress) IsResumable() bool {
 	return p.Phase == PhaseWriting && p.CurrentChapter > 0
 }
 
-// NextChapter 返回下一个要写的章节号。
+// NextChapter trả về số chương kế tiếp cần viết.
 func (p *Progress) NextChapter() int {
 	return p.LatestCompleted() + 1
 }
 
-// LatestCompleted 返回最大已完成章节号；无已完成章节时返回 0。
+// LatestCompleted trả về số chương đã hoàn thành lớn nhất; trả về 0 khi chưa có chương nào.
 func (p *Progress) LatestCompleted() int {
 	max := 0
 	for _, ch := range p.CompletedChapters {
@@ -89,15 +93,15 @@ func (p *Progress) LatestCompleted() int {
 	return max
 }
 
-// ContextProfile 上下文加载策略，根据总章节数自适应。
+// ContextProfile chiến lược nạp ngữ cảnh, tự thích ứng theo tổng số chương.
 type ContextProfile struct {
-	SummaryWindow  int  // 加载最近 N 章摘要
-	TimelineWindow int  // 加载最近 N 章时间线
-	Layered        bool // true = 启用分层摘要加载（卷摘要+弧摘要+章摘要）
+	SummaryWindow  int  // nạp tóm tắt N chương gần nhất
+	TimelineWindow int  // nạp dòng thời gian N chương gần nhất
+	Layered        bool // true = bật nạp tóm tắt phân tầng (tóm tắt tập + tóm tắt cung + tóm tắt chương)
 }
 
-// MemoryPolicy 表示运行时共享的记忆使用策略。
-// 它既用于上下文输出，也用于宿主层的 handoff / reminder 决策。
+// MemoryPolicy biểu thị chiến lược dùng bộ nhớ dùng chung lúc chạy.
+// Nó vừa dùng cho đầu ra ngữ cảnh, vừa dùng cho quyết định handoff / reminder của tầng host.
 type MemoryPolicy struct {
 	Mode                string `json:"mode,omitempty"`
 	SummaryWindow       int    `json:"summary_window,omitempty"`
@@ -118,7 +122,7 @@ type MemoryPolicy struct {
 	ReadOnlyThreshold   int    `json:"read_only_threshold,omitempty"`
 }
 
-// NewContextProfile 根据总章节数计算上下文策略。
+// NewContextProfile tính chiến lược ngữ cảnh theo tổng số chương.
 func NewContextProfile(totalChapters int) ContextProfile {
 	switch {
 	case totalChapters <= 15:
@@ -130,24 +134,24 @@ func NewContextProfile(totalChapters int) ContextProfile {
 	}
 }
 
-// NewChapterMemoryPolicy 根据进度与上下文策略生成章节运行时记忆策略。
+// NewChapterMemoryPolicy sinh chiến lược bộ nhớ runtime cấp chương theo tiến độ và chiến lược ngữ cảnh.
 func NewChapterMemoryPolicy(progress *Progress, profile ContextProfile, currentOutlineBound bool) MemoryPolicy {
 	policy := MemoryPolicy{
 		Mode:                "chapter",
 		SummaryWindow:       profile.SummaryWindow,
 		TimelineWindow:      profile.TimelineWindow,
 		LayeredSummaries:    profile.Layered,
-		WorkingRefresh:      "每次按章节加载时刷新",
-		EpisodicRefresh:     "随章节提交、评审和长篇状态变更刷新",
+		WorkingRefresh:      "làm mới mỗi lần nạp theo chương",
+		EpisodicRefresh:     "làm mới khi nộp chương, xem xét và thay đổi trạng thái truyện dài",
 		PreviousTailChars:   800,
 		ChapterPlanEnabled:  true,
 		CurrentOutlineBound: currentOutlineBound,
 		ReadOnlyThreshold:   5,
 	}
 	if profile.Layered {
-		policy.SummaryStrategy = "卷摘要+弧摘要+最近章节摘要"
+		policy.SummaryStrategy = "tóm tắt tập + tóm tắt cung + tóm tắt chương gần nhất"
 	} else {
-		policy.SummaryStrategy = "最近章节摘要"
+		policy.SummaryStrategy = "tóm tắt chương gần nhất"
 	}
 	if progress != nil {
 		if progress.TotalChapters > 30 {
@@ -172,36 +176,36 @@ func NewChapterMemoryPolicy(progress *Progress, profile ContextProfile, currentO
 	return policy
 }
 
-// NewArchitectMemoryPolicy 返回规划阶段使用的记忆策略。
+// NewArchitectMemoryPolicy trả về chiến lược bộ nhớ dùng ở giai đoạn quy hoạch.
 func NewArchitectMemoryPolicy() MemoryPolicy {
 	return MemoryPolicy{
 		Mode:               "architect",
-		PlanningRefresh:    "卷弧结构、指南针或摘要更新时刷新",
-		FoundationRefresh:  "角色、伏笔、设定变更时刷新",
-		PlanningFocus:      "分层大纲、指南针、卷摘要",
-		FoundationFocus:    "角色设定、角色快照、伏笔台账",
+		PlanningRefresh:    "làm mới khi cấu trúc tập/cung, la bàn hoặc tóm tắt cập nhật",
+		FoundationRefresh:  "làm mới khi nhân vật, phục bút, thiết lập thay đổi",
+		PlanningFocus:      "dàn ý phân tầng, la bàn, tóm tắt tập",
+		FoundationFocus:    "thiết lập nhân vật, snapshot nhân vật, sổ theo dõi phục bút",
 		HandoffPreferred:   true,
 		ChapterPlanEnabled: false,
 		ReadOnlyThreshold:  4,
 	}
 }
 
-// RunMeta 运行元信息，持久化到 meta/run.json。
+// RunMeta thông tin runtime, lưu bền xuống meta/run.json.
 type RunMeta struct {
 	StartedAt            string             `json:"started_at"`
 	Provider             string             `json:"provider,omitempty"`
 	Style                string             `json:"style"`
 	Model                string             `json:"model"`
 	PlanningTier         PlanningTier       `json:"planning_tier,omitempty"`
-	StartPrompt          string             `json:"start_prompt,omitempty"`           // 用户原始创作需求（输入事实，先于启动裁定落盘；裁定失败后据此补裁）
-	PlanStart            *PlanStartRecord   `json:"plan_start,omitempty"`             // 启动裁定事实，规划期崩溃恢复的唯一依据
-	PendingSteer         string             `json:"pending_steer,omitempty"`          // 未完成的 Steer 指令，中断恢复时重新注入
-	AdvanceMode          ChapterAdvanceMode `json:"advance_mode"`                     // 章节推进模式：auto / review
-	AdvancePermitChapter int                `json:"advance_permit_chapter,omitempty"` // review 模式下一次性许可的正向章节
-	AdvanceHold          *AdvanceHold       `json:"advance_hold,omitempty"`           // 当前干预签署的一次性暂停意图
+	StartPrompt          string             `json:"start_prompt,omitempty"`           // nhu cầu sáng tác gốc của người dùng (sự kiện đầu vào, lưu trước phán định khởi động; nếu phán định thất bại thì phán bổ sung theo đây)
+	PlanStart            *PlanStartRecord   `json:"plan_start,omitempty"`             // sự kiện phán định khởi động, căn cứ duy nhất để khôi phục crash trong kỳ quy hoạch
+	PendingSteer         string             `json:"pending_steer,omitempty"`          // lệnh Steer chưa hoàn thành, tiêm lại khi khôi phục gián đoạn
+	AdvanceMode          ChapterAdvanceMode `json:"advance_mode"`                     // chế độ đẩy chương: auto / review
+	AdvancePermitChapter int                `json:"advance_permit_chapter,omitempty"` // chương tiến xuôi được cấp phép một lần ở chế độ review
+	AdvanceHold          *AdvanceHold       `json:"advance_hold,omitempty"`           // ý định tạm dừng một lần do can thiệp hiện tại ký
 }
 
-// ChapterAdvanceMode 决定新章节是否需要逐章许可。
+// ChapterAdvanceMode quyết định chương mới có cần cấp phép từng chương hay không.
 type ChapterAdvanceMode string
 
 const (
@@ -209,22 +213,22 @@ const (
 	ChapterAdvanceReview ChapterAdvanceMode = "review"
 )
 
-// Valid 报告章节推进模式是否受当前版本支持。
+// Valid báo cáo chế độ đẩy chương có được phiên bản hiện tại hỗ trợ không.
 func (m ChapterAdvanceMode) Valid() bool {
 	return m == ChapterAdvanceAuto || m == ChapterAdvanceReview
 }
 
-// UnsupportedAdvanceModeError 表示书的控制模式不受当前二进制支持。
-// 调用方必须停止构造可写 Host，并提示用户使用匹配版本；禁止猜测降级。
+// UnsupportedAdvanceModeError biểu thị chế độ điều khiển của sách không được binary hiện tại hỗ trợ.
+// Bên gọi phải dừng dựng Host ghi được, và nhắc người dùng dùng phiên bản khớp; cấm đoán mù hạ cấp.
 type UnsupportedAdvanceModeError struct {
 	Mode ChapterAdvanceMode
 }
 
 func (e *UnsupportedAdvanceModeError) Error() string {
-	return fmt.Sprintf("不支持的章节推进模式 %q，请使用创建该项目的新版 ainovel", e.Mode)
+	return fmt.Sprintf("chế độ đẩy chương không được hỗ trợ %q, hãy dùng phiên bản ainovel mới đã tạo dự án này", e.Mode)
 }
 
-// AdvanceHoldAfter 是一次性暂停的确定性触发条件。
+// AdvanceHoldAfter là điều kiện kích hoạt tất định cho tạm dừng một lần.
 type AdvanceHoldAfter string
 
 const (
@@ -233,39 +237,40 @@ const (
 	AdvanceHoldAtChapter            AdvanceHoldAfter = "chapter"
 )
 
-// Valid 报告暂停条件是否受当前版本支持。
+// Valid báo cáo điều kiện tạm dừng có được phiên bản hiện tại hỗ trợ không.
 func (a AdvanceHoldAfter) Valid() bool {
 	return a == AdvanceHoldAtBoundary || a == AdvanceHoldAfterRewritesDrained || a == AdvanceHoldAtChapter
 }
 
-// AdvanceHold 是当前干预签署的一次性暂停意图，由 Host 边界消费。
+// AdvanceHold là ý định tạm dừng một lần do can thiệp hiện tại ký, được Host tiêu thụ tại ranh giới.
 type AdvanceHold struct {
 	After         AdvanceHoldAfter `json:"after"`
 	TargetChapter int              `json:"target_chapter,omitempty"`
 	Reason        string           `json:"reason"`
 }
 
-// Validate 校验一次性暂停意图自身的结构约束。
+// Validate kiểm tra ràng buộc cấu trúc tự thân của ý định tạm dừng một lần.
 func (h AdvanceHold) Validate() error {
 	if !h.After.Valid() {
-		return fmt.Errorf("不支持的一次性暂停条件 %q", h.After)
+		return fmt.Errorf("điều kiện tạm dừng một lần không được hỗ trợ %q", h.After)
 	}
 	if h.After == AdvanceHoldAtChapter {
 		if h.TargetChapter <= 0 {
-			return fmt.Errorf("目标章节必须大于 0")
+			return fmt.Errorf("chương mục tiêu phải lớn hơn 0")
 		}
 	} else if h.TargetChapter != 0 {
-		return fmt.Errorf("暂停条件 %q 不能设置目标章节", h.After)
+		return fmt.Errorf("điều kiện tạm dừng %q không thể đặt chương mục tiêu", h.After)
 	}
 	if strings.TrimSpace(h.Reason) == "" {
-		return fmt.Errorf("一次性暂停原因不能为空")
+		return fmt.Errorf("lý do tạm dừng một lần không được để trống")
 	}
 	return nil
 }
 
-// PlanStartRecord 启动裁定的持久化事实(裁定先落事实,再起执行;恢复不重新裁定)。
-// 首个 save_foundation 落盘 scale 后,规划期恢复改由 PlanningTier 推导,本记录
-// 只覆盖"裁定完成到首次落盘之间"的窗口。DecisionID 关联 decisions.jsonl 审计。
+// PlanStartRecord sự kiện lưu bền của phán định khởi động (phán định lưu sự kiện trước, rồi mới
+// chạy; khôi phục không phán định lại). Sau lần save_foundation đầu tiên lưu scale xuống đĩa,
+// khôi phục kỳ quy hoạch đổi thành suy ra từ PlanningTier, bản ghi này chỉ phủ cửa sổ "từ khi
+// phán định xong đến lần lưu đầu tiên". DecisionID liên kết kiểm toán decisions.jsonl.
 type PlanStartRecord struct {
 	RawPrompt   string `json:"raw_prompt"`
 	Planner     string `json:"planner"`

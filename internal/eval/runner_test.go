@@ -62,7 +62,7 @@ func (f *fakeEngine) wasAborted() bool {
 func TestDriveTimeoutDrainsToDone(t *testing.T) {
 	f := newFakeEngine()
 	err := drive(f, 1, RunOptions{Timeout: 30 * time.Millisecond})
-	if err == nil || !strings.Contains(err.Error(), "超时") {
+	if err == nil || !strings.Contains(err.Error(), "vượt thời hạn") {
 		t.Fatalf("超时应返回超时错误，得到 %v", err)
 	}
 	if !f.wasAborted() {

@@ -18,8 +18,9 @@ import (
 const maxPromptEventCols = 160
 
 func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
-	// body 高度依赖顶栏/底栏的实时高度（新建页模式栏、多行输入都会改变它），
-	// 每条消息前同步一次，避免 viewport 停在旧高度、面板底部补空行。幂等且廉价。
+	// Chiều cao body phụ thuộc chiều cao thời gian thực của thanh trên/thanh dưới (thanh
+	// chế độ trang mới, đầu vào nhiều dòng đều làm nó đổi), đồng bộ mỗi tin trước khi xử
+	// lý, tránh viewport dừng ở chiều cao cũ, đáy bảng lấp dòng trống. Luật hợp nhất và rẻ.
 	if m.width > 0 {
 		m.updateViewportSize()
 	}
@@ -95,8 +96,9 @@ func (m Model) handleBlockingModalKey(msg tea.KeyMsg, next func(tea.KeyMsg) (tea
 		return m, tea.Tick(time.Second, func(time.Time) tea.Msg { return quitResetMsg{} }), true
 	}
 	m.quitPending = false
-	// 跨模态全局快捷键：modal 打开期间也要能切鼠标上报，否则共创/help/report 等
-	// 锁屏式 modal 下用户无法用原生拖拽选中复制。
+	// Phím tắt toàn cục xuyên modal: khi modal mở vẫn phải chuyển được báo chuột, nếu
+	// không trong các modal khóa màn hình như đồng sáng tạo/help/report người dùng
+	// không thể kéo chọn copy gốc.
 	if msg.Type == tea.KeyCtrlR {
 		next, cmd := m.toggleMouseReporting()
 		return next, cmd, true
@@ -105,11 +107,13 @@ func (m Model) handleBlockingModalKey(msg tea.KeyMsg, next func(tea.KeyMsg) (tea
 	return model, cmd, true
 }
 
-// toggleMouseReporting 切换鼠标上报开关。开 → 关让用户原生拖拽选中复制；
-// 关 → 开恢复点击切焦点 / 滚轮。base 路径与 blocking modal 路径共用。
+// toggleMouseReporting công tắc báo chuột. Bật → tắt cho người dùng kéo chọn copy gốc;
+// tắt → bật khôi phục click đổi tiêu điểm / con lăn. Đường base và đường blocking modal
+// dùng chung.
 func (m Model) toggleMouseReporting() (Model, tea.Cmd) {
-	// 欢迎页(modeNew)本就不开鼠标上报，原生拖拽即可复制；此处忽略 Ctrl+R，
-	// 避免误开上报反而破坏原生复制。鼠标上报由 enterRunning 在进入工作台时打开。
+	// Trang chào (modeNew) vốn không bật báo chuột, kéo chọn gốc đã copy được; ở đây
+	// bỏ qua Ctrl+R, tránh bật nhầm báo chuột lại phá copy gốc. Báo chuột do enterRunning
+	// bật khi vào bàn làm việc.
 	if m.mode == modeNew {
 		return m, nil
 	}
@@ -123,8 +127,8 @@ func (m Model) toggleMouseReporting() (Model, tea.Cmd) {
 // donePlaceholder hoàn thành tác phẩm
 const donePlaceholder = "Truyện đã hoàn thành · Có thể nhập yêu cầu sửa đổi (vd: \"viết lại chương 3\"), /reopen để viết tiếp tập mới, hoặc /export để xuất truyện"
 
-// enterRunning 进入创作工作台：开启鼠标上报（工作台需要点击切面板 / 滚轮 /
-// 拖拽侧边栏）。返回的命令需由调用方 Batch 进最终返回值。
+// enterRunning vào bàn sáng tác: bật báo chuột (bàn làm việc cần click đổi bảng /
+// con lăn / kéo thanh bên). Lệnh trả về cần bên gọi Batch vào giá trị trả cuối.
 func (m *Model) enterRunning() tea.Cmd {
 	m.mode = modeRunning
 	m.mouseOff = false
@@ -170,10 +174,11 @@ func (m Model) handleCommandPaletteKey(msg tea.KeyMsg) (tea.Model, tea.Cmd, bool
 }
 
 func (m Model) handleBaseKeyMsg(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
-	// 节流防御：粘贴 \n 在不支持 bracketed paste 的终端会退化成连续 KeyEnter；
-	// 真人按 Enter 与前一字符间隔通常 > 100ms，<50ms 极可能是粘贴流残片。
-	// 只记 KeyRunes（字符流）—— 功能键（↑↓/Tab/Ctrl-x）不应污染节流，
-	// 否则用户翻历史选定后立刻按 Enter 会被误吞。
+	// Phòng thủ tiết lưu: paste \n ở terminal không hỗ trợ bracketed paste sẽ thoái hóa
+	// thành KeyEnter liên tục; người thật bấm Enter cách ký tự trước thường > 100ms,
+	// < 50ms gần như chắc là mảnh sót của dòng paste.
+	// Chỉ ghi KeyRunes (dòng ký tự) — phím chức năng (↑↓/Tab/Ctrl-x) không được làm bẩn
+	// tiết lưu, nếu không người dùng lật lịch sử chọn xong bấm Enter ngay sẽ bị nuốt nhầm.
 	if msg.Type == tea.KeyRunes {
 		m.lastKeyAt = time.Now()
 	}
@@ -192,7 +197,7 @@ func (m Model) handleBaseKeyMsg(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		m.resetOutputPanels()
 		return m, nil
 	case tea.KeyCtrlU:
-		// 清空当前输入；同时退出历史浏览态。
+		// Xóa ô nhập hiện tại; đồng thời thoát trạng thái duyệt lịch sử.
 		m.textarea.Reset()
 		m.historyIdx = len(m.inputHistory)
 		m.historyDraft = ""
@@ -217,13 +222,14 @@ func (m Model) handleBaseKeyMsg(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		m.focusPane = (m.focusPane + 1) % focusPaneCount
 		return m, nil
 	case tea.KeyEnter:
-		// Alt+Enter 是主动换行，让 textarea.Update 接管（KeyMap.InsertNewline 已绑到此键）。
+		// Alt+Enter là xuống dòng chủ động, để textarea.Update tiếp quản (KeyMap.InsertNewline đã gán phím này).
 		if msg.Alt {
 			break
 		}
-		// 与上一次非 Enter 按键间隔过短 → 视为粘贴流的 \n 残片：
-		// 替换为空格保留视觉间隔，与 cleanHumanKeyRunes 路径语义一致（"abc\ndef" → "abc def"）。
-		// 防御 bracketed paste 失效的终端环境（旧 SSH/某些 tmux 配置）。
+		// Khoảng cách với lần gõ khác Enter trước quá ngắn → coi là mảnh sót \n của dòng paste:
+		// thay bằng dấu cách giữ khoảng cách trực quan, cùng ngữ nghĩa với đường
+		// cleanHumanKeyRunes ("abc\ndef" → "abc def").
+		// Phòng thủ môi trường terminal bracketed paste hỏng (SSH cũ/một số cấu hình tmux).
 		if !m.lastKeyAt.IsZero() && time.Since(m.lastKeyAt) < 50*time.Millisecond {
 			var cmd tea.Cmd
 			m.textarea, cmd = m.textarea.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{' '}})
@@ -232,11 +238,12 @@ func (m Model) handleBaseKeyMsg(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		}
 		return m.handleEnterKey()
 	case tea.KeyUp:
-		// 多行输入：让 textarea 接管光标行内移动（落到 switch 后的 textarea.Update）
+		// Đầu vào nhiều dòng: để textarea tiếp quản di chuyển con trỏ trong dòng (rơi vào
+		// textarea.Update sau switch)
 		if m.textareaIsMultiline() {
 			break
 		}
-		// 单行：优先翻历史，没有可用历史时回退到事件流滚动
+		// Một dòng: ưu tiên lật lịch sử, khi không còn lịch sử dùng được thì lùi về cuộn luồng sự kiện
 		if m.tryHistoryUp() {
 			return m, nil
 		}
@@ -315,17 +322,20 @@ func (m Model) handleEnterKey() (tea.Model, tea.Cmd) {
 		m.cocreate = newCoCreateState(text)
 		return m, m.sendCoCreate()
 	case modeRunning:
-		// 不本地回显 USER 事件 —— Host.Continue/Steer 入口已 emit "USER" 事件，
-		// 走 events channel 回流到 TUI。架构 §2.3：观察层只观察，不产生事实。
+		// Không hiển thị lại sự kiện USER cục bộ — lối vào Host.Continue/Steer đã emit sự kiện
+		// "USER", theo kênh events chảy về TUI. Kiến trúc §2.3: tầng quan sát chỉ quan sát,
+		// không sinh sự kiện.
 		if !m.snapshot.IsRunning {
 			return m, continueRuntime(m.runtime, text)
 		}
 		return m, steerRuntime(m.runtime, text)
 	case modeDone:
-		// 完结后用户输入（返工/续写诉求）：唤醒新一轮 run。Continue 在停机态走 Inject
-		// 自动恢复，Arbiter 裁定用户干预；返工已写章时由 Engine 重开全书并入队。
-		// 切回 modeRunning 重入工作台；本轮跑完
-		// doneMsg(complete) 会再置 modeDone。斜杠命令已在上面提前处理，不经此分支。
+		// Đầu vào của người dùng sau khi hoàn sách (nhu cầu viết lại/viết tiếp): đánh thức
+		// vòng run mới. Continue ở trạng thái dừng đi Inject tự khôi phục, Arbiter phán định
+		// can thiệp người dùng; khi viết lại chương đã viết thì Engine mở lại toàn sách và
+		// đưa vào hàng đợi.
+		// Chuyển lại modeRunning vào lại bàn làm việc; vòng này chạy xong doneMsg(complete)
+		// sẽ đặt lại modeDone. Lệnh gạch chéo đã xử lý sớm ở trên, không qua nhánh này.
 		m.mode = modeRunning
 		return m, continueRuntime(m.runtime, text)
 	default:
@@ -368,9 +378,9 @@ func (m Model) handleVerticalScrollKey(msg tea.KeyMsg, upward bool) (tea.Model, 
 
 func (m Model) handleMouseMsg(msg tea.MouseMsg) (tea.Model, tea.Cmd) {
 	if m.cocreate != nil {
-		// 鼠标按 X 坐标分流：屏幕左半 = conv 面板，右半 = prompt 面板。
-		// modal 居中且 conv 占左 ~58%，用屏幕中线判别足够准确。
-		// 用户在 conv 区滚轮自动停止 follow（让其能稳定停在某个历史位置）。
+		// Chuột chia theo tọa độ X: nửa trái màn hình = bảng conv, nửa phải = bảng prompt.
+		// Modal căn giữa và conv chiếm trái ~58%, dùng đường giữa màn hình phân biệt đủ chính xác.
+		// Người dùng con lăn ở vùng conv tự ngừng follow (cho dừng ổn định ở một vị trí lịch sử).
 		var cmd tea.Cmd
 		if msg.X < m.width/2 {
 			m.cocreate.convFollow = false
@@ -433,8 +443,9 @@ func (m Model) handleRuntimeMsg(msg tea.Msg) (tea.Model, tea.Cmd, bool) {
 		}
 		return m, cmd, true
 	case bootstrapMsg:
-		// 是否已有作品决定界面落点，恢复成功只决定引擎是否运行。数据升级、
-		// 预算或修订门禁失败时仍留在工作台展示原书，不能退回欢迎页。
+		// Có tác phẩm hay không quyết định điểm rơi giao diện, khôi phục thành công chỉ quyết
+		// định engine có chạy không. Khi nâng cấp dữ liệu, ngân sách hay cổng soát soát
+		// thất bại vẫn ở lại bàn làm việc hiển thị sách cũ, không được lùi về trang chào.
 		if (msg.existing || msg.resumed) && m.mode == modeNew && !msg.completed {
 			enableMouse := m.enterRunning()
 			m.resizeTextarea()
@@ -444,8 +455,9 @@ func (m Model) handleRuntimeMsg(msg tea.Msg) (tea.Model, tea.Cmd, bool) {
 			}
 			return m, tea.Batch(fetchSnapshot(m.runtime), enableMouse), true
 		}
-		// 完结书：落完成态工作台（enterRunning 开鼠标后改 modeDone），不落欢迎页——
-		// 欢迎页对已有书只字不提，用户会以为书丢了；/reopen、/export、返工输入都在工作台。
+		// Sách đã hoàn: rơi vào bàn làm việc trạng thái hoàn tất (enterRunning bật chuột rồi
+		// đổi modeDone), không rơi trang chào — trang chào với sách sẵn có chỉ không nhắc gì,
+		// người dùng sẽ tưởng sách mất; /reopen, /export, nhập viết lại đều ở bàn làm việc.
 		if msg.completed && m.mode == modeNew {
 			enableMouse := m.enterRunning()
 			m.mode = modeDone
@@ -456,7 +468,7 @@ func (m Model) handleRuntimeMsg(msg tea.Msg) (tea.Model, tea.Cmd, bool) {
 			}
 			return m, tea.Batch(fetchSnapshot(m.runtime), enableMouse, m.textarea.Focus()), true
 		}
-		// /reopen 等会话内恢复从完成态重新进入创作台。
+		// /reopen v.v. khôi phục trong phiên từ trạng thái hoàn tất vào lại bàn sáng tác.
 		if msg.resumed && m.mode == modeDone {
 			enableMouse := m.enterRunning()
 			m.resizeTextarea()
@@ -490,9 +502,10 @@ func (m Model) handleRuntimeMsg(msg tea.Msg) (tea.Model, tea.Cmd, bool) {
 		if msg.complete {
 			m.abortPending = false
 			m.mode = modeDone
-			// 完成态不锁输入框：停止自动续写，但用户仍可输入返工要求（modeDone 输入经
-			// Continue 唤醒新一轮 run，Arbiter 裁定返工或继续创作；/export、/model
-			// 等命令也需可用，输入框必须保持聚焦（issue #27、#38）。
+			// Trạng thái hoàn tất không khóa ô nhập: ngừng tự viết tiếp, nhưng người dùng vẫn
+			// nhập được yêu cầu viết lại (đầu vào modeDone đánh thức vòng run mới qua Continue,
+			// Arbiter phán viết lại hay tiếp tục sáng tác; /export, /model v.v. cũng cần dùng
+			// được, ô nhập phải giữ tiêu điểm (issue #27, #38).
 			m.textarea.Placeholder = donePlaceholder
 			return m, tea.Batch(fetchSnapshot(m.runtime), listenDone(m.runtime), m.textarea.Focus()), true
 		}
@@ -592,6 +605,19 @@ func (m Model) handleRuntimeMsg(msg tea.Msg) (tea.Model, tea.Cmd, bool) {
 		}
 		m.modelConfig = nil
 		return m, tea.Batch(fetchSnapshot(m.runtime), m.textarea.Focus()), true
+	case styleSavedMsg:
+		// Lưu thể loại là thao tác bên lề: giữ modal mở để tiếp tục chỉnh provider/model,
+		// khác với lưu provider xong thì đóng bảng.
+		if m.modelConfig == nil {
+			return m, nil, true
+		}
+		m.modelConfig.saving = false
+		if msg.err != nil {
+			m.modelConfig.message = "Lưu thể loại thất bại: " + msg.err.Error()
+			return m, nil, true
+		}
+		m.modelConfig.message = "Đã lưu thể loại: " + m.modelConfig.styleLabel()
+		return m, nil, true
 	case modelConfigConnectionMsg:
 		if m.modelConfig == nil {
 			return m, nil, true
@@ -642,7 +668,8 @@ func (m Model) handleRuntimeMsg(msg tea.Msg) (tea.Model, tea.Cmd, bool) {
 		m.spinnerIdx = (m.spinnerIdx + 1) % len(spinnerFrames)
 		m.cursorIdx++
 		if m.snapshot.IsRunning {
-			// 顶栏、活动提示和流式光标共用低频动画，避免多条常驻 timer 重复触发全屏 View。
+			// Thanh trên, gợi ý hoạt động và con trỏ stream dùng chung hoạt ảnh tần số thấp,
+			// tránh nhiều timer thường trực lặp kích View toàn màn hình.
 			m.refreshEventViewport()
 			m.refreshStreamViewport()
 			m.streamDirty = false
@@ -666,7 +693,8 @@ func (m Model) handleRuntimeMsg(msg tea.Msg) (tea.Model, tea.Cmd, bool) {
 			m.streamRounds = append(m.streamRounds, "")
 		}
 		m.streamRounds[len(m.streamRounds)-1] += string(msg)
-		// 不立即刷新；首个 delta 启动一次 16ms 合并窗口，后续 delta 复用该 timer。
+		// Không refresh ngay; delta đầu khởi động một cửa sổ gộp 16ms, các delta sau dùng
+		// lại timer đó.
 		m.streamDirty = true
 		cmd := listenStream(m.runtime)
 		if !m.flushPending {
@@ -675,7 +703,7 @@ func (m Model) handleRuntimeMsg(msg tea.Msg) (tea.Model, tea.Cmd, bool) {
 		}
 		return m, cmd, true
 	case streamClearMsg:
-		// round 边界：先把累积 delta 刷出去，新 round 才能视觉对齐
+		// Ranh giới round: đẩy delta tích lũy ra trước, round mới mới thẳng hàng về mặt trực quan
 		if m.flushStreamIfDirty() && m.streamScroll {
 			m.streamVP.GotoBottom()
 		}
@@ -741,8 +769,8 @@ func (m Model) handleStartResultMsg(msg startResultMsg) (tea.Model, tea.Cmd) {
 			return m, tea.Batch(fetchSnapshot(m.runtime), m.textarea.Focus())
 		}
 		if wasStarting {
-			// 回车后已经进入工作台；启动阶段的 LLM 错误就在当前工作台展示，
-			// 不再退回欢迎页。
+			// Đã vào bàn làm việc sau Enter; lỗi LLM giai đoạn khởi động hiện ngay trên bàn
+			// làm việc hiện tại, không lùi về trang chào nữa.
 			m.mode = modeRunning
 			m.snapshot.IsRunning = false
 			m.snapshot.RuntimeState = "idle"
@@ -828,17 +856,19 @@ func (m Model) handleTextareaMsg(msg tea.Msg) (tea.Model, tea.Cmd) {
 	return m, cmd
 }
 
-// applyEvent 记录一条 TUI 本地产生的事件并更新投影。Host 事件已经在产生端
-// 落过日志，事件订阅路径应直接调用 applyEventProjection，避免重复记录。
+// applyEvent ghi lại một sự kiện do TUI sinh cục bộ và cập nhật phép chiếu. Sự kiện
+// của Host đã ghi nhật ký ở nơi sinh; đường subscribe sự kiện phải gọi trực tiếp
+// applyEventProjection, tránh ghi trùng.
 func (m *Model) applyEvent(ev host.Event) {
 	host.LogEvent(ev)
 	m.applyEventProjection(ev)
 }
 
-// applyEventProjection 把一条事件应用到 m.events：
-// - 带 ID 且已存在 → 原地更新（合并完成态字段，保留首次的 Time / Summary）
-// - 新事件 → 追加，必要时记录到 eventIndex
-// - 超过 maxEvents 时做滑动截断并重建索引
+// applyEventProjection áp một sự kiện vào m.events:
+//   - có ID và đã tồn tại → cập nhật tại chỗ (gộp trường trạng thái kết thúc, giữ
+//     Time / Summary của lần đầu)
+//   - sự kiện mới → nối thêm, khi cần ghi vào eventIndex
+//   - vượt maxEvents thì cắt trượt và dựng lại chỉ mục
 func (m *Model) applyEventProjection(ev host.Event) {
 	if ev.ID != "" {
 		if idx, ok := m.eventIndex[ev.ID]; ok && idx >= 0 && idx < len(m.events) {
@@ -861,11 +891,13 @@ func (m *Model) applyEventProjection(ev host.Event) {
 			if ev.Kind != "" {
 				existing.Kind = ev.Kind
 			}
-			// Summary 非空时允许覆盖（结束态可能带补充信息）；否则保留首次
+			// Summary khác rỗng thì cho phép đè (trạng thái kết thúc có thể mang thông tin bổ
+			// sung); nếu không giữ của lần đầu
 			if ev.Summary != "" {
 				existing.Summary = ev.Summary
 			}
-			// 重试事件同 ID 跨 attempt 更新，新截止时刻要跟上，倒计时才会随之重置
+			// Sự kiện retry cùng ID cập nhật xuyên attempt, thời điểm chốt mới phải theo kịp,
+			// đếm ngược mới reset theo
 			if !ev.RetryAt.IsZero() {
 				existing.RetryAt = ev.RetryAt
 			}
@@ -884,8 +916,8 @@ func (m *Model) applyEventProjection(ev host.Event) {
 	}
 }
 
-// trimStreamRounds 把 streamRounds 截断到 maxStreamRounds 段；超出从头丢弃。
-// 调用时机：每次 streamClear 新开轮次后。
+// trimStreamRounds cắt streamRounds về maxStreamRounds đoạn; vượt thì bỏ từ đầu.
+// Thời điểm gọi: sau mỗi lần streamClear mở vòng mới.
 func (m *Model) trimStreamRounds() {
 	if len(m.streamRounds) <= maxStreamRounds {
 		return

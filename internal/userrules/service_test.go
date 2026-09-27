@@ -7,8 +7,9 @@ import (
 	"github.com/voocel/ainovel-cli/internal/store"
 )
 
-// nil 模型 + 空规则目录：归一化全降级，但快照仍可产出（system_defaults 兜底）并落盘。
-// LoadOptions{} 的两个目录为空串，RawFileSources 返回 nil，测试不触碰真实磁盘。
+// Model nil + thư mục rules rỗng: chuẩn hóa hạ cấp toàn bộ, nhưng snapshot vẫn xuất được
+// (system_defaults buộc phải) và ghi xuống đĩa. Hai thư mục của LoadOptions{} là chuỗi rỗng,
+// RawFileSources trả nil, test không đụng đĩa thật.
 func newDegradedService(t *testing.T) (*Service, *store.Store) {
 	t.Helper()
 	st := store.NewStore(t.TempDir())
@@ -20,27 +21,27 @@ func TestService_Build_DegradesButPersists(t *testing.T) {
 
 	snap, err := svc.Build(t.Context(), "每章1200字，主角冷静克制")
 	if err != nil {
-		t.Fatalf("Build 不应报错（降级而非阻断）：%v", err)
+		t.Fatalf("Build không được báo lỗi (hạ cấp thay vì chặn): %v", err)
 	}
 	if snap.Status != rules.StatusDegraded {
-		t.Fatalf("无模型应降级，status=%q", snap.Status)
+		t.Fatalf("Không có model phải hạ cấp, status=%q", snap.Status)
 	}
-	// system_defaults 始终兜底机械基线。
+	// system_defaults luôn là fallback cho cơ sở cơ học.
 	if len(snap.Structured.FatigueWords) == 0 || len(snap.Structured.ForbiddenPhrases) == 0 {
-		t.Fatalf("应保留 system_defaults 机械基线，got %+v", snap.Structured)
+		t.Fatalf("Phải giữ cơ sở cơ học của system_defaults, got %+v", snap.Structured)
 	}
-	// 启动 prompt 降级为 raw preferences，原文不丢。
+	// Prompt khởi động hạ cấp thành raw preferences, văn bản gốc không mất.
 	if snap.Preferences == "" {
-		t.Fatal("降级应把启动 prompt 原文记入 preferences")
+		t.Fatal("Hạ cấp phải ghi nguyên văn prompt khởi động vào preferences")
 	}
 
-	// 已落盘：GetOrBuild 读回同一份而非重建。
+	// Đã ghi xuống đĩa: GetOrBuild đọc lại cùng một bản thay vì dựng lại.
 	reloaded, err := st.UserRules.Load()
 	if err != nil || reloaded == nil {
-		t.Fatalf("快照应已落盘：err=%v snap=%v", err, reloaded)
+		t.Fatalf("Snapshot phải đã ghi xuống đĩa: err=%v snap=%v", err, reloaded)
 	}
 	if reloaded.Preferences != snap.Preferences {
-		t.Fatal("落盘内容与返回不一致")
+		t.Fatal("Nội dung ghi xuống đĩa khác giá trị trả về")
 	}
 }
 
@@ -48,17 +49,17 @@ func TestService_GetOrBuildInitializesMissingSnapshot(t *testing.T) {
 	svc, st := newDegradedService(t)
 
 	if cur, _ := st.UserRules.Load(); cur != nil {
-		t.Fatal("初始应无快照")
+		t.Fatal("Ban đầu phải không có snapshot")
 	}
 	snap, err := svc.GetOrBuild(t.Context())
 	if err != nil {
-		t.Fatalf("GetOrBuild 不应报错：%v", err)
+		t.Fatalf("GetOrBuild không được báo lỗi: %v", err)
 	}
 	if len(snap.Structured.FatigueWords) == 0 {
-		t.Fatal("惰性生成应含 system_defaults")
+		t.Fatal("Sinh lười phải chứa system_defaults")
 	}
 	if cur, _ := st.UserRules.Load(); cur == nil {
-		t.Fatal("GetOrBuild 应顺带落盘")
+		t.Fatal("GetOrBuild phải ghi xuống đĩa luôn")
 	}
 }
 
@@ -68,24 +69,24 @@ func TestService_AddRuntimeRule_PersistsAndReturnsCandidate(t *testing.T) {
 	const text = "以后少用比喻"
 	merged, cand, err := svc.AddRuntimeRule(t.Context(), text)
 	if err != nil {
-		t.Fatalf("AddRuntimeRule 不应报错：%v", err)
+		t.Fatalf("AddRuntimeRule không được báo lỗi: %v", err)
 	}
-	// 候选用于回显：无模型时降级，原文进 preferences。
+	// Ứng viên dùng để hiển thị lại: không model thì hạ cấp, văn bản gốc vào preferences.
 	if !cand.Degraded {
-		t.Fatal("无模型时本次候选应降级")
+		t.Fatal("Không model thì ứng viên lần này phải hạ cấp")
 	}
 	if cand.Preferences != text {
-		t.Fatalf("候选应保留原文，got %q", cand.Preferences)
+		t.Fatalf("Ứng viên phải giữ nguyên văn, got %q", cand.Preferences)
 	}
-	// 叠加后快照含该条且已落盘。
+	// Sau khi phủ, snapshot chứa mục đó và đã ghi xuống đĩa.
 	if merged.Preferences == "" {
-		t.Fatal("叠加后 preferences 不应为空")
+		t.Fatal("Sau khi phủ preferences không được rỗng")
 	}
 	reloaded, err := st.UserRules.Load()
 	if err != nil || reloaded == nil {
-		t.Fatalf("叠加后应落盘：err=%v", err)
+		t.Fatalf("Sau khi phủ phải ghi xuống đĩa: err=%v", err)
 	}
 	if reloaded.Status != rules.StatusDegraded {
-		t.Fatalf("含降级来源，status 应为 degraded，got %q", reloaded.Status)
+		t.Fatalf("Có nguồn hạ cấp, status phải là degraded, got %q", reloaded.Status)
 	}
 }

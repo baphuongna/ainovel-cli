@@ -53,7 +53,7 @@ func TestInitRunMeta_PreservesHistory(t *testing.T) {
 	dir := t.TempDir()
 	store := NewStore(dir)
 
-	// 先建立带运行意图的 RunMeta
+	// Trước tiên dựng RunMeta có ý định vận hành
 	_ = store.RunMeta.Save(domain.RunMeta{
 		StartedAt:    "old",
 		Provider:     "openai",
@@ -62,7 +62,7 @@ func TestInitRunMeta_PreservesHistory(t *testing.T) {
 		PendingSteer: "待处理",
 	})
 
-	// Init 应保留 PendingSteer 等运行意图事实
+	// Init phải giữ lại các sự thực ý định vận hành như PendingSteer
 	_ = store.RunMeta.Init("suspense", "openrouter", "new-model")
 
 	meta, _ := store.RunMeta.Load()
@@ -87,7 +87,7 @@ func TestSetAndClearPendingSteer(t *testing.T) {
 	dir := t.TempDir()
 	store := NewStore(dir)
 
-	// 设置 PendingSteer
+	// Đặt PendingSteer
 	if err := store.RunMeta.SetPendingSteer("主角改成女性"); err != nil {
 		t.Fatalf("SetPendingSteer: %v", err)
 	}
@@ -96,7 +96,7 @@ func TestSetAndClearPendingSteer(t *testing.T) {
 		t.Errorf("expected pending steer, got %s", meta.PendingSteer)
 	}
 
-	// 清除
+	// Xóa
 	if err := store.RunMeta.ClearPendingSteer(); err != nil {
 		t.Fatalf("ClearPendingSteer: %v", err)
 	}
@@ -130,7 +130,7 @@ func TestClearPendingSteer_Noop(t *testing.T) {
 	dir := t.TempDir()
 	store := NewStore(dir)
 
-	// 空 meta 上调用不报错
+	// Gọi trên meta rỗng không báo lỗi
 	if err := store.RunMeta.ClearPendingSteer(); err != nil {
 		t.Fatalf("ClearPendingSteer on empty: %v", err)
 	}
@@ -184,7 +184,7 @@ func TestInitRunMeta_PreservesAdvanceIntent(t *testing.T) {
 	_ = store.RunMeta.GrantAdvancePermit(7)
 	hold := domain.AdvanceHold{After: domain.AdvanceHoldAtBoundary, Reason: "验收"}
 	_ = store.RunMeta.SetAdvanceHold(hold)
-	// 进程重启路径：Host.New 每次都会调 Init，用户运行意图必须存活。
+	// Đường dẫn khởi động lại tiến trình: Host.New mỗi lần đều gọi Init, ý định vận hành của người dùng phải sống sót.
 	_ = store.RunMeta.Init("fantasy", "openrouter", "m")
 
 	meta, _ := store.RunMeta.Load()
@@ -258,9 +258,9 @@ func TestInitRunMeta_UnknownAdvanceModeDoesNotWrite(t *testing.T) {
 	}
 }
 
-// TestRunMetaInit_PreservesPlanStart 规划期(裁定已落盘、首个 foundation 未落盘)
-// 崩溃重启时,Host.New 的 RunMeta.Init 不得清掉 PlanStart——它是恢复规划师身份的
-// 唯一依据(engine.planStartFallback)。
+// TestRunMetaInit_PreservesPlanStart khi khởi động lại sau crash trong giai đoạn lập kế hoạch (phán
+// định đã lưu đĩa, foundation đầu tiên chưa lưu đĩa), RunMeta.Init của Host.New không được xóa PlanStart
+// — đó là căn cứ duy nhất khôi phục danh tính planner (engine.planStartFallback).
 func TestRunMetaInit_PreservesPlanStart(t *testing.T) {
 	store := NewStore(t.TempDir())
 	if err := store.RunMeta.SetStartPrompt("写个悬疑短篇"); err != nil {
@@ -270,7 +270,7 @@ func TestRunMetaInit_PreservesPlanStart(t *testing.T) {
 	if err := store.RunMeta.SetPlanStart(rec); err != nil {
 		t.Fatalf("set plan start: %v", err)
 	}
-	// 模拟进程重启:Host.New 会再次 Init
+	// Mô phỏng khởi động lại tiến trình: Host.New sẽ Init lần nữa
 	if err := store.RunMeta.Init("default", "openrouter", "m"); err != nil {
 		t.Fatalf("init: %v", err)
 	}
@@ -279,10 +279,40 @@ func TestRunMetaInit_PreservesPlanStart(t *testing.T) {
 		t.Fatalf("load: %v", err)
 	}
 	if meta.PlanStart == nil || meta.PlanStart.Planner != "architect_short" {
-		t.Fatalf("Init 必须保留 PlanStart, got %+v", meta.PlanStart)
+		t.Fatalf("Init phải giữ lại PlanStart, got %+v", meta.PlanStart)
 	}
-	// StartPrompt 同样是跨重启事实:裁定失败后它是引擎补裁的唯一依据。
+	// StartPrompt cũng là sự thực xuyên suốt khởi động lại: sau khi phán định thất bại nó là căn cứ duy nhất để engine phán định bù.
 	if meta.StartPrompt != "写个悬疑短篇" {
-		t.Fatalf("Init 必须保留 StartPrompt, got %q", meta.StartPrompt)
+		t.Fatalf("Init phải giữ lại StartPrompt, got %q", meta.StartPrompt)
+	}
+}
+
+// TestRunMetaSetStyle chốt hợp đồng SetStyle (T4): cập nhật duy nhất trường style của sách đang
+// mở mà không đụng các trường vận hành khác (khác Init — ghi lại toàn bộ ngữ cảnh khởi động).
+func TestRunMetaSetStyle(t *testing.T) {
+	dir := t.TempDir()
+	store := NewStore(dir)
+	if err := store.RunMeta.Init("default", "openrouter", "test-model"); err != nil {
+		t.Fatalf("Init: %v", err)
+	}
+	if err := store.RunMeta.SetPlanningTier(domain.PlanningTierLong); err != nil {
+		t.Fatalf("SetPlanningTier: %v", err)
+	}
+
+	if err := store.RunMeta.SetStyle("wuxia"); err != nil {
+		t.Fatalf("SetStyle: %v", err)
+	}
+	meta, err := store.RunMeta.Load()
+	if err != nil {
+		t.Fatalf("Load: %v", err)
+	}
+	if meta.Style != "wuxia" {
+		t.Fatalf("style sau SetStyle = %q, want %q", meta.Style, "wuxia")
+	}
+	if meta.PlanningTier != domain.PlanningTierLong {
+		t.Fatalf("SetStyle không được đụng planning_tier, được %q", meta.PlanningTier)
+	}
+	if meta.Provider != "openrouter" || meta.Model != "test-model" {
+		t.Fatalf("SetStyle không được đụng provider/model, được %q/%q", meta.Provider, meta.Model)
 	}
 }

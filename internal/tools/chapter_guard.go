@@ -12,7 +12,7 @@ import (
 // for layered books, inside the currently expanded outline.
 func EnsureChapterExpanded(st *store.Store, chapter int) error {
 	if st == nil {
-		return fmt.Errorf("store 不能为空: %w", errs.ErrToolPrecondition)
+		return fmt.Errorf("store không được rỗng: %w", errs.ErrToolPrecondition)
 	}
 	if chapter <= 0 {
 		return fmt.Errorf("chapter must be > 0: %w", errs.ErrToolArgs)
@@ -22,10 +22,10 @@ func EnsureChapterExpanded(st *store.Store, chapter int) error {
 		return fmt.Errorf("load progress: %w: %w", errs.ErrStoreRead, err)
 	}
 	if progress == nil {
-		return fmt.Errorf("progress 未初始化: %w", errs.ErrToolPrecondition)
+		return fmt.Errorf("progress chưa được khởi tạo: %w", errs.ErrToolPrecondition)
 	}
 	if progress.Phase != domain.PhaseWriting {
-		return fmt.Errorf("章节写作仅允许在 writing 阶段（当前 phase=%s）: %w", progress.Phase, errs.ErrToolPrecondition)
+		return fmt.Errorf("viết chương chỉ được phép ở giai đoạn writing (hiện phase=%s): %w", progress.Phase, errs.ErrToolPrecondition)
 	}
 	if !progress.Layered {
 		return nil
@@ -38,6 +38,6 @@ func EnsureChapterExpanded(st *store.Store, chapter int) error {
 		return nil
 	}
 	return fmt.Errorf(
-		"第 %d 章不在分层大纲范围内：写作必须先 expand_arc 扩展弧或 append_volume 追加卷；若全书已完结请调 save_foundation type=complete_book: %w",
+		"chương %d không nằm trong phạm vi dàn ý phân tầng: muốn viết phải expand_arc để mở rộng cung hoặc append_volume để thêm volume; nếu cả sách đã hoàn thành hãy gọi save_foundation type=complete_book: %w",
 		chapter, errs.ErrToolPrecondition)
 }

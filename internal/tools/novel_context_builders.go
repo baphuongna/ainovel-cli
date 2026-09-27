@@ -35,8 +35,8 @@ type architectContextEnvelope struct {
 	References map[string]any
 }
 
-// planningVolumeOutline 是 Architect 的只读结构投影。已完成弧只保留边界和数量，
-// 未完成/未发生弧保留详细章节，避免长篇上下文随已写章节数线性膨胀。
+// planningVolumeOutline là phép chiếu cấu trúc chỉ đọc cho Architect. Cung đã hoàn thành chỉ giữ biên và số lượng,
+// cung chưa hoàn thành/chưa xảy ra giữ chương chi tiết, tránh ngữ cảnh trường thiên phình to tuyến tính theo số chương đã viết.
 type planningVolumeOutline struct {
 	Index int                  `json:"index"`
 	Title string               `json:"title"`
@@ -75,7 +75,7 @@ func newArchitectContextEnvelope() architectContextEnvelope {
 }
 
 func (e chapterContextEnvelope) apply(result map[string]any) {
-	// 章节路径会先后应用准备阶段和构建阶段的内容，因此合并已有分区。
+	// Đường dẫn chương sẽ lần lượt áp dụng nội dung giai đoạn chuẩn bị và giai đoạn xây dựng, nên gộp các phân vùng sẵn có.
 	mergeEnvelopeSection(result, "working_memory", e.Working)
 	mergeEnvelopeSection(result, "episodic_memory", e.Episodic)
 	mergeEnvelopeSection(result, "reference_pack", e.References)
@@ -84,7 +84,7 @@ func (e chapterContextEnvelope) apply(result map[string]any) {
 	}
 }
 
-// mergeEnvelopeSection 把 section 合并进 result[key] 的既有容器；容器不存在时直接挂载。
+// mergeEnvelopeSection gộp section vào container sẵn có của result[key]; nếu container không tồn tại thì gắn trực tiếp.
 func mergeEnvelopeSection(result map[string]any, key string, section map[string]any) {
 	if existing, ok := result[key].(map[string]any); ok {
 		for k, v := range section {
@@ -101,8 +101,8 @@ func (e architectContextEnvelope) apply(result map[string]any) {
 	result["reference_pack"] = e.References
 }
 
-// buildProgressStatus 在 Architect 不传 chapter 时返回进度摘要。
-// Writer/Editor 的章节路径不需要这些信息，避免干扰写作。
+// buildProgressStatus trả về tóm tắt tiến độ khi Architect không truyền chapter.
+// Đường dẫn chương của Writer/Editor không cần các thông tin này, tránh làm nhiễu việc viết.
 func (t *ContextTool) buildProgressStatus(result map[string]any, reads *contextReads) {
 	progress, err := t.store.Progress.Load()
 	if err != nil {
@@ -146,23 +146,23 @@ func (t *ContextTool) buildProgressStatus(result map[string]any, reads *contextR
 	result["progress_status"] = status
 }
 
-// buildUserRules 把合并后的 Bundle 注入 working_memory.user_rules（canonical 路径）。
+// buildUserRules chèn Bundle đã gộp vào working_memory.user_rules (đường dẫn canonical).
 //
-// 单点注入：writer / editor / architect 任一路径调用 novel_context
-// 都能在 working_memory.user_rules 拿到一致的偏好。architect 路径原本没有 working_memory，
-// 由本函数按需新建（仅装 user_rules）；chapter > 0 路径下 working_memory 已存在，直接嵌入。
+// Chèn một điểm duy nhất: bất kỳ đường dẫn writer / editor / architect nào gọi novel_context
+// đều lấy được cùng một tập sở thích tại working_memory.user_rules. Đường dẫn architect vốn không có working_memory,
+// hàm này tạo mới theo nhu cầu (chỉ chứa user_rules); dưới đường dẫn chapter > 0 thì working_memory đã tồn tại, nhúng thẳng.
 //
-// 即便 Bundle 为空也注入，保持字段稳定，避免 LLM 看到 user_rules=null 而走异常分支。
+// Dù Bundle rỗng vẫn chèn, giữ trường ổn định, tránh LLM thấy user_rules=null rồi đi nhánh ngoại lệ.
 //
-// 注入策略：只给 LLM 看 structured + preferences——这两项才是创作时需要遵循的偏好。
-// sources / conflicts 是诊断信息（用户冲突排查），不进 LLM；由 CLI 启动诊断面板按需展示。
+// Chiến lược chèn: chỉ cho LLM thấy structured + preferences — hai mục này mới là sở thích cần tuân theo khi sáng tác.
+// sources / conflicts là thông tin chuẩn đoán (truy vết xung đột người dùng), không vào LLM; do bảng chẩn đoán khi khởi động CLI hiển thị theo nhu cầu.
 func (t *ContextTool) buildUserRules(result map[string]any, reads *contextReads) {
 	snap, err := t.store.UserRules.Load()
 	if err != nil {
 		reads.require("user_rules", err)
 	}
 	if snap == nil {
-		// 快照尚未初始化时使用代码内置默认，保证机械底线（字数/禁语/疲劳词）始终存在。
+		// Khi snapshot chưa khởi tạo thì dùng mặc định nội bộ của code, bảo đảm chuẩn cơ học (số chữ/từ cấm/từ mệt mỏi) luôn tồn tại.
 		def := rules.BuildSnapshot([]rules.Candidate{rules.SystemDefaults()})
 		snap = &def
 	}
@@ -269,11 +269,11 @@ func (t *ContextTool) prepareChapterContext(chapter int, envelope *chapterContex
 	}
 	state.chapterPlan = chapterPlan
 
-	// 是否正在重写本章：决定 novel_context 是否补"重写专用"事实。
+	// Có đang viết lại chương này hay không: quyết định novel_context có bổ sung sự kiện "riêng cho viết lại" hay không.
 	isRewrite := progress != nil && slices.Contains(progress.PendingRewrites, chapter)
 
-	// 暴露 draft 是否已存在的事实：让 writer 被重派时能自行判断跳过重写还是覆盖。
-	// 只暴露 exists + word_count，不注入正文（正文让 writer 按需用 read_chapter 拉）。
+	// Bộc lộ sự kiện draft đã tồn tại hay chưa: để writer khi được giao lại tự quyết định bỏ qua việc viết lại hay ghi đè.
+	// Chỉ bộc lộ exists + word_count, không nhúng chính văn (chính văn để writer kéo bằng read_chapter khi cần).
 	if _, draftWords, draftErr := t.store.Drafts.LoadChapterContent(chapter); draftErr == nil && draftWords > 0 {
 		envelope.Working["chapter_draft"] = map[string]any{
 			"exists":     true,
@@ -283,9 +283,9 @@ func (t *ContextTool) prepareChapterContext(chapter int, envelope *chapterContex
 		reads.require("chapter_draft", draftErr)
 	}
 
-	// 重写时把"为什么改 + 改哪里"交给 writer：理由来自返工队列，具体批评来自本章评审
-	// （selectReviewLessons 只召回 chapter-1..chapter-3，恰好漏掉本章本身，writer 又无读评审的工具）。
-	// 正文不在此注入——保持"正文按需 read_chapter 拉"的约定不破。
+	// Khi viết lại, giao cho writer "vì sao sửa + sửa ở đâu": lý do đến từ hàng đợi viết lại, phê bình cụ thể đến từ lần xem xét chương này
+	// (selectReviewLessons chỉ tri hồi chapter-1..chapter-3, tình cờ bỏ sót chính chương này, mà writer lại không có công cụ đọc kết quả xem xét).
+	// Chính văn không nhúng ở đây — giữ nguyên thỏa ước "chính văn kéo bằng read_chapter khi cần".
 	if isRewrite {
 		brief := map[string]any{"reason": progress.RewriteReason}
 		if reviews, reviewErr := t.store.World.LoadReviewsAffectingChapter(chapter); reviewErr == nil {
@@ -298,8 +298,8 @@ func (t *ContextTool) prepareChapterContext(chapter int, envelope *chapterContex
 				}
 				var issues []domain.ConsistencyIssue
 				for _, issue := range review.Issues {
-					// 新评审按问题到章节的映射精准下发；旧评审没有映射时保留
-					// 全部问题，避免历史返工理由在升级后消失。
+					// Xem xét mới phát xuống chính xác theo ánh xạ vấn đề-đến-chương; xem xét cũ không có ánh xạ thì giữ
+					// toàn bộ vấn đề, tránh lý do viết lại lịch sử biến mất sau khi nâng cấp.
 					if len(issue.Chapters) == 0 || (issue.RequiresChange && slices.Contains(issue.Chapters, chapter)) {
 						issues = append(issues, issue)
 					}
@@ -314,7 +314,7 @@ func (t *ContextTool) prepareChapterContext(chapter int, envelope *chapterContex
 			}
 			if len(sources) > 0 {
 				brief["reviews"] = sources
-				// 单来源保留旧字段，避免已存在的上下文消费者升级时丢失信息。
+				// Nguồn đơn giữ trường cũ, tránh người tiêu thụ ngữ cảnh sẵn có mất thông tin khi nâng cấp.
 				if len(sources) == 1 {
 					brief["review_summary"] = sources[0]["summary"]
 					if issues, ok := sources[0]["issues"]; ok {
@@ -387,10 +387,10 @@ func (t *ContextTool) buildChapterContext(result map[string]any, state contextBu
 	envelope.apply(result)
 }
 
-// buildStyleStats 对全部已完成章节做全书级风格统计，注入 episodic_memory.style_stats。
-// 弧内评审窗口对"章均几十次的句式 tic、章末形态同构、跨章复读"天然失明，只有
-// 全书统计能暴露——统计归代码（确定性），裁定归 LLM（editor 在 aesthetic 维度
-// 按数字判分，writer 据此自避免）。章数不足时 stylestat 返回 nil，不注入。
+// buildStyleStats thống kê phong cách cấp toàn sách trên toàn bộ chương đã hoàn thành, chèn vào episodic_memory.style_stats.
+// Cửa sổ xem xét trong cung vốn mù với "tic câu thức xuất hiện hàng chục lần mỗi chương, kết cấu đuôi chương đồng dạng, lặp lại xuyên chương", chỉ
+// thống kê toàn sách mới bộc lộ được — thống kê thuộc về code (tính xác định), phán định thuộc về LLM (editor chấm điểm
+// theo con số ở chiều aesthetic, writer dựa đó mà tự tránh). Khi số chương không đủ, stylestat trả về nil, không chèn.
 func (t *ContextTool) buildStyleStats(envelope *chapterContextEnvelope, state contextBuildState, reads *contextReads) {
 	if state.progress == nil || len(state.progress.CompletedChapters) == 0 {
 		return
@@ -420,7 +420,7 @@ func (t *ContextTool) buildStyleStats(envelope *chapterContextEnvelope, state co
 	envelope.Episodic["style_stats"] = stats
 }
 
-// styleStopwords 收集角色名与别名供短语挖掘过滤——出场人名天然高频，不是文风问题。
+// styleStopwords thu thập tên và biệt danh nhân vật để lọc khi khai thác cụm từ — tên nhân vật xuất hiện vốn tần suất cao, không phải vấn đề văn phong.
 func (t *ContextTool) styleStopwords(reads *contextReads) []string {
 	var words []string
 	if chars, err := t.store.Characters.Load(); err == nil {
@@ -450,12 +450,12 @@ func (t *ContextTool) buildChapterWorkingMemory(envelope *chapterContextEnvelope
 
 	if state.profile.Layered {
 		t.loadLayeredSummaries(envelope.Working, state.chapter, state.profile.SummaryWindow, reads)
-		// 收官纪律：本章属于已宣告的收官卷时注入，防 writer 在收官段临章再开新钩子
-		//（收官卷写完即自动完结，此时新埋的伏笔永远没有机会回收）。
+		// Kỷ luật kết thúc: chèn khi chương này thuộc quyển kết thúc đã tuyên bố, phòng writer mở móc mới sát chương trong đoạn kết
+		//(quyển kết thúc viết xong là tự hoàn thành, lúc đó phục bút mới cài sẽ không bao giờ có cơ hội thu hồi).
 		if volumes, err := t.store.Outline.LoadLayeredOutline(); err == nil {
 			if fv := domain.FinaleVolume(volumes); fv > 0 {
 				if b, boundaryErr := t.store.Outline.CheckArcBoundary(state.chapter); boundaryErr == nil && b != nil && b.Volume == fv {
-					envelope.Working["finale"] = "本卷为全书收官卷：不再新开长线或埋新伏笔，优先回收既有伏笔、收拢关系线，按大纲把故事推向终局。"
+					envelope.Working["finale"] = "Quyển này là quyển kết thúc của toàn sách: không mở tuyến dài mới hay cài phục bút mới nữa, ưu tiên thu hồi phục bút đã có, siết các tuyến quan hệ, đẩy câu chuyện đến hồi kết theo dàn ý."
 				} else {
 					reads.require("arc_boundary", boundaryErr)
 				}
@@ -486,8 +486,8 @@ func (t *ContextTool) buildChapterWorkingMemory(envelope *chapterContextEnvelope
 		}
 		if len(state.progress.HookHistory) > 0 {
 			checkpoint["hook_history"] = state.progress.HookHistory
-			// 同时给出计数：只给序列，模型会自己数，而且数错——实测 Editor 连续三次
-			// 报"约 18/22 章是 mystery"，真实值是 16。凡是能算的事实都由代码算好再交给它。
+			// Đồng thời đưa ra số đếm: chỉ đưa chuỗi thì mô hình tự đếm, mà đếm sai — thực đo Editor ba lần liên tiếp
+			// báo "khoảng 18/22 chương là mystery", giá trị thật là 16. Sự kiện gì tính được thì code tính sẵn rồi mới giao cho nó.
 			checkpoint["hook_type_counts"] = countByValue(state.progress.HookHistory)
 		}
 		envelope.Working["checkpoint"] = checkpoint
@@ -506,8 +506,8 @@ func (t *ContextTool) buildChapterWorkingMemory(envelope *chapterContextEnvelope
 	}
 }
 
-// buildOutlineWindow 为 Writer/Editor 保留与当前任务直接相关的大纲，而不是注入
-// 随全书增长的完整扁平大纲。分层模式使用当前弧；非分层模式使用最近一个评审周期。
+// buildOutlineWindow giữ cho Writer/Editor dàn ý liên quan trực tiếp đến nhiệm vụ hiện tại, thay vì nhúng
+// dàn ý phẳng đầy đủ phình theo cả cuốn sách. Chế độ phân tầng dùng cung hiện tại; chế độ không phân tầng dùng chu kỳ xem xét gần nhất.
 func (t *ContextTool) buildOutlineWindow(working map[string]any, state contextBuildState, reads *contextReads) {
 	outline := state.outline
 	if len(outline) == 0 {
@@ -556,8 +556,8 @@ func (t *ContextTool) buildChapterEpisodicMemory(envelope *chapterContextEnvelop
 		envelope.Episodic["foreshadow_ledger"] = state.foreshadow
 	}
 
-	// 配角名册：召回最近活跃的次要角色，让 Writer 在引入旧角色时能保持口吻/定位一致
-	// 不召回所有条目（长篇会膨胀），只给最近活跃的前 N 个，按 LastSeenChapter 倒序
+	// Sổ danh nhân vật phụ: tri hồi nhân vật phụ hoạt động gần đây, để Writer khi đưa nhân vật cũ vào giữ được giọng điệu/định vị nhất quán
+	// Không tri hồi toàn bộ mục (trường thiên sẽ phình), chỉ cho N mục hoạt động gần nhất, sắp ngược theo LastSeenChapter
 	if recentCast, err := t.store.Cast.RecentActive(15); err == nil && len(recentCast) > 0 {
 		simplified := make([]map[string]any, 0, len(recentCast))
 		for _, e := range recentCast {
@@ -743,8 +743,8 @@ func (t *ContextTool) buildArchitectPlanning(envelope *architectContextEnvelope,
 	} else {
 		reads.require("volume_summaries", err)
 	}
-	// 卷摘要承接已完成卷；当前卷的弧摘要承接最近实际剧情。扩弧时两者与
-	// 骨架目标同时交给 Architect，让模型自行决定保留还是修订未写计划。
+	// Tóm tắt quyển nối tiếp các quyển đã hoàn thành; tóm tắt cung của quyển hiện tại nối tiếp cốt truyện thực tế gần nhất. Khi mở rộng cung, cả hai cùng
+	// mục tiêu khung xương được giao cho Architect, để mô hình tự quyết định giữ hay chỉnh sửa kế hoạch chưa viết.
 	if progressErr == nil && progress != nil && progress.CurrentVolume > 0 {
 		if arcSummaries, err := t.store.Summaries.LoadArcSummaries(progress.CurrentVolume); err == nil && len(arcSummaries) > 0 {
 			envelope.Planning["arc_summaries"] = arcSummaries
@@ -755,9 +755,9 @@ func (t *ContextTool) buildArchitectPlanning(envelope *architectContextEnvelope,
 		reads.require("progress_for_arc_summaries", progressErr)
 	}
 
-	// completion_signals 把"全书是否该结尾"的关键事实集中呈现，
-	// 让架构师在裁定 complete_book / append_volume 时一眼看到对照面。
-	// 散落在 progress / compass / foreshadow / layered_outline 里靠 LLM 脑算容易漏。
+	// completion_signals tập trung trình bày các sự kiện then chốt "toàn sách có nên kết thúc không",
+	// để kiến trúc sư nhìn ngay thấy mặt đối chiếu khi phán định complete_book / append_volume.
+	// Rải rác trong progress / compass / foreshadow / layered_outline mà để LLM tự nhẩm thì dễ sót.
 	envelope.Planning["completion_signals"] = t.completionSignals(layered, compass, reads)
 }
 
@@ -874,8 +874,8 @@ func (t *ContextTool) buildArchitectFoundation(envelope *architectContextEnvelop
 	} else {
 		reads.require("foundation_status", err)
 	}
-	// Writer 反馈池:commit_chapter 落盘的大纲偏离/建议,规划下一弧/卷时必须参考;
-	// expand_arc / append_volume / update_compass 成功后自动清空(已消费)。
+	// Bể phản hồi Writer: lệch dàn ý/gợi ý do commit_chapter ghi xuống đĩa, bắt buộc tham khảo khi quy hoạch cung/quyển tiếp theo;
+	// expand_arc / append_volume / update_compass thành công thì tự động dọn sạch (đã tiêu thụ).
 	if fbs, err := t.store.Outline.LoadPendingOutlineFeedback(); err == nil && len(fbs) > 0 {
 		envelope.Foundation["writer_feedback"] = fbs
 	} else {
@@ -893,7 +893,7 @@ func (t *ContextTool) buildArchitectReferences(envelope *architectContextEnvelop
 	envelope.References["references"] = t.architectReferences()
 }
 
-// countByValue 统计取值频次，供上下文里"可数事实"直接落成数字。
+// countByValue thống kê tần suất giá trị, để "sự kiện đếm được" trong ngữ cảnh thành số trực tiếp.
 func countByValue(values []string) map[string]int {
 	out := make(map[string]int, len(values))
 	for _, v := range values {

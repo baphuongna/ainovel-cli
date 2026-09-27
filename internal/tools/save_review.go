@@ -16,7 +16,7 @@ import (
 	"github.com/voocel/ainovel-cli/internal/store"
 )
 
-// SaveReviewTool 保存 Editor 的审阅结果。
+// SaveReviewTool lưu kết quả xem xét của Editor.
 type SaveReviewTool struct {
 	store *store.Store
 }
@@ -27,42 +27,42 @@ func NewSaveReviewTool(store *store.Store) *SaveReviewTool {
 
 func (t *SaveReviewTool) Name() string { return "save_review" }
 func (t *SaveReviewTool) Description() string {
-	return "保存审阅结果并更新流程状态。verdict 为 accept/polish/rewrite 之一。" +
-		"Editor 依据完整上下文作出 verdict，工具只校验事实并原子更新 Progress。" +
-		"返回结构化事实：verdict / affected_chapters / next_flow / next_chapter"
+	return "Lưu kết quả xem xét và cập nhật trạng thái luồng. verdict là một trong accept/polish/rewrite." +
+		"Editor đưa ra verdict dựa trên ngữ cảnh đầy đủ, công cụ chỉ kiểm tra sự kiện và cập nhật Progress một thể nguyên tử." +
+		"Trả về sự kiện có cấu trúc: verdict / affected_chapters / next_flow / next_chapter"
 }
-func (t *SaveReviewTool) Label() string { return "保存审阅" }
+func (t *SaveReviewTool) Label() string { return "Lưu kết quả xem xét" }
 
-// 写工具（同时更新 reviews/ 与 Progress 的 PendingRewrites/Flow），禁止并发。
+// Công cụ ghi (đồng thời cập nhật reviews/ và PendingRewrites/Flow của Progress), cấm đồng thời.
 func (t *SaveReviewTool) ReadOnly(_ json.RawMessage) bool        { return false }
 func (t *SaveReviewTool) ConcurrencySafe(_ json.RawMessage) bool { return false }
 func (t *SaveReviewTool) StrictSchema() bool                     { return true }
 
 func (t *SaveReviewTool) Schema() map[string]any {
 	issueSchema := schema.Object(
-		schema.Property("type", schema.String("问题维度；可使用评审提示中的基础维度，也可写更准确的具体维度")).Required(),
-		schema.Property("severity", schema.Enum("严重程度", "critical", "error", "warning")).Required(),
-		schema.Property("description", schema.String("问题描述")).Required(),
-		schema.Property("evidence", schema.String("证据：原文片段、具体情节或状态数据")).Required(),
-		schema.Property("suggestion", llmcontract.Nullable(schema.String("修改建议；无需建议时为 null"))).Required(),
-		schema.Property("chapters", schema.Array("该问题证据实际所在的章节；弧评审必须落在任务给定区间", schema.Int("章节号"))).Required(),
-		schema.Property("requires_change", schema.Bool("该问题是否应立即触发所列章节返工，由 Editor 结合整体阅读体验判断")).Required(),
+		schema.Property("type", schema.String("Chiều vấn đề; có thể dùng chiều cơ sở trong prompt xem xét, cũng có thể viết chiều cụ thể chính xác hơn")).Required(),
+		schema.Property("severity", schema.Enum("Mức nghiêm trọng", "critical", "error", "warning")).Required(),
+		schema.Property("description", schema.String("Mô tả vấn đề")).Required(),
+		schema.Property("evidence", schema.String("Bằng chứng: đoạn văn gốc, tình tiết cụ thể hoặc dữ liệu trạng thái")).Required(),
+		schema.Property("suggestion", llmcontract.Nullable(schema.String("Gợi ý sửa; không cần gợi ý thì để null"))).Required(),
+		schema.Property("chapters", schema.Array("Chương mà bằng chứng của vấn đề này thực sự nằm ở; xem xét cung phải nằm trong khoảng nhiệm vụ giao", schema.Int("Số chương"))).Required(),
+		schema.Property("requires_change", schema.Bool("Vấn đề này có nên kích hoạt ngay viết lại các chương liệt kê hay không, do Editor phán đoán theo trải nghiệm đọc tổng thể")).Required(),
 	)
 	dimensionSchema := schema.Object(
-		schema.Property("dimension", schema.String("评价维度；由当前评审任务和 rubric 决定")).Required(),
-		schema.Property("score", schema.Int("评分（0-100）")).Required(),
-		schema.Property("comment", schema.String("该维度的简要结论和证据；每个维度必填")).Required(),
+		schema.Property("dimension", schema.String("Chiều đánh giá; do nhiệm vụ xem xét hiện tại và rubric quyết định")).Required(),
+		schema.Property("score", schema.Int("Điểm số (0-100)")).Required(),
+		schema.Property("comment", schema.String("Kết luận và bằng chứng tóm tắt của chiều này; mỗi chiều bắt buộc điền")).Required(),
 	)
 	return schema.Object(
-		schema.Property("chapter", schema.Int("审阅的章节号（全局审阅填最新章节号）")).Required(),
-		schema.Property("scope", schema.Enum("审阅范围", "chapter", "global", "arc")).Required(),
-		schema.Property("dimensions", schema.Array("分维度评分；基础 rubric 由 Editor 提示提供，可按任务补充更具体维度", dimensionSchema)).Required(),
-		schema.Property("issues", schema.Array("发现的问题", issueSchema)).Required(),
-		schema.Property("contract_status", llmcontract.Nullable(schema.Enum("章节契约完成度；不适用时为 null", "met", "partial", "missed"))).Required(),
-		schema.Property("contract_misses", schema.Array("未完成或违背的 contract 条目；无则为空数组", schema.String(""))).Required(),
-		schema.Property("contract_notes", llmcontract.Nullable(schema.String("对 contract 履行情况的简要说明；无则为 null"))).Required(),
-		schema.Property("verdict", schema.Enum("审阅结论", "accept", "polish", "rewrite")).Required(),
-		schema.Property("summary", schema.String("审阅总结")).Required(),
+		schema.Property("chapter", schema.Int("Số chương được xem xét (xem xét toàn cục điền số chương mới nhất)")).Required(),
+		schema.Property("scope", schema.Enum("Phạm vi xem xét", "chapter", "global", "arc")).Required(),
+		schema.Property("dimensions", schema.Array("Điểm theo từng chiều; rubric cơ sở do prompt Editor cung cấp, có thể bổ sung chiều cụ thể hơn theo nhiệm vụ", dimensionSchema)).Required(),
+		schema.Property("issues", schema.Array("Các vấn đề phát hiện", issueSchema)).Required(),
+		schema.Property("contract_status", llmcontract.Nullable(schema.Enum("Mức hoàn thành hợp đồng chương; không áp dụng thì để null", "met", "partial", "missed"))).Required(),
+		schema.Property("contract_misses", schema.Array("Mục contract chưa hoàn thành hoặc vi phạm; không có thì dùng mảng rỗng", schema.String(""))).Required(),
+		schema.Property("contract_notes", llmcontract.Nullable(schema.String("Mô tả tóm tắt về việc thực hiện contract; không có thì để null"))).Required(),
+		schema.Property("verdict", schema.Enum("Kết luận xem xét", "accept", "polish", "rewrite")).Required(),
+		schema.Property("summary", schema.String("Tổng kết xem xét")).Required(),
 	)
 }
 
@@ -114,7 +114,7 @@ func (t *SaveReviewTool) Execute(_ context.Context, args json.RawMessage) (json.
 	}
 	if existing != nil {
 		if !reflect.DeepEqual(*existing, r) {
-			return nil, fmt.Errorf("第 %d 章聚合评审已存在且内容不同，拒绝覆盖: %w", r.Chapter, errs.ErrToolConflict)
+			return nil, fmt.Errorf("Xem xét tổng hợp chương %d đã tồn tại và nội dung khác nhau, từ chối ghi đè: %w", r.Chapter, errs.ErrToolConflict)
 		}
 		return t.finishReview(r, progress, scope, artifact)
 	}
@@ -129,8 +129,8 @@ func (t *SaveReviewTool) Execute(_ context.Context, args json.RawMessage) (json.
 		}
 	}
 
-	// 先原子应用控制状态，再保存审阅工件。若第二步失败，返工意图仍然存在；
-	// Writer 排空队列后，路由会因审阅工件缺失而重新派发 Editor，不会跳过审阅。
+	// Áp dụng trạng thái điều khiển một thể nguyên tử trước, rồi mới lưu tác phẩm xem xét. Nếu bước hai thất bại, ý định viết lại vẫn tồn tại;
+	// sau khi Writer cạn hàng đợi, định tuyến sẽ thấy thiếu tác phẩm xem xét mà giao lại Editor, không bỏ qua bước xem xét.
 	latest, err := t.store.Progress.ApplyReviewOutcome(reviewOutcome, affected, r.Summary)
 	if err != nil {
 		return nil, fmt.Errorf("apply review outcome: %w", err)
@@ -152,7 +152,7 @@ func (t *SaveReviewTool) finishReview(
 		return nil, fmt.Errorf("checkpoint review: %w", err)
 	}
 
-	// 使用原子更新返回的 Progress 快照作为事实，避免二次读取产生新的失败窗口。
+	// Dùng snapshot Progress do cập nhật nguyên tử trả về làm sự kiện, tránh đọc lần hai mở thêm cửa sổ thất bại mới.
 	nextFlow := string(domain.FlowWriting)
 	nextChapter := 0
 	if progress != nil {
@@ -276,8 +276,8 @@ func uniqueSortedChapters(chapters []int) []int {
 	return result
 }
 
-// reviewFlow 是文学裁定与持久化协议之间唯一的映射点。verdict 由 Editor 决定；
-// 这里只接受 Router 能恢复的三种控制结果。
+// reviewFlow là điểm ánh xạ duy nhất giữa phán định văn học và giao thức lưu trữ. verdict do Editor quyết định;
+// ở đây chỉ nhận ba kết quả điều khiển mà Router phục hồi được.
 func reviewFlow(verdict string) (domain.FlowState, error) {
 	switch verdict {
 	case "accept":

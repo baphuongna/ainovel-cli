@@ -51,11 +51,11 @@ func TestObserverSubagentRetryEventsUpdateSameLinePerAgent(t *testing.T) {
 	if events[0].ID == "" || events[1].ID != events[0].ID {
 		t.Fatalf("writer retry events should share ID: %+v", events)
 	}
-	// Summary 不嵌静态延时（UI 依 RetryAt 倒计时）；延时以截止时刻形式携带，静态快照留在 Detail 供日志。
-	if events[1].Agent != "writer" || !strings.Contains(events[1].Summary, "重试 (2/7)") {
+	// Summary không nhúng độ trễ tĩnh (UI đếm ngược theo RetryAt); độ trễ mang theo dạng thời điểm hết hạn, snapshot tĩnh để lại trong Detail cho log.
+	if events[1].Agent != "writer" || !strings.Contains(events[1].Summary, "Thử lại (2/7)") {
 		t.Fatalf("event = %+v, want writer retry 2/7 without inline delay", events[1])
 	}
-	if events[1].RetryAt.IsZero() || !strings.Contains(events[1].Detail, "重试 (2/7，2s后)") {
+	if events[1].RetryAt.IsZero() || !strings.Contains(events[1].Detail, "Thử lại (2/7, sau 2s): ") {
 		t.Fatalf("event = %+v, want RetryAt deadline + static delay in Detail", events[1])
 	}
 	if events[1].Kind != "network" {
@@ -98,17 +98,17 @@ func TestObserverDispatchErrorUpdatesSingleEventWithDetail(t *testing.T) {
 	o.dispatchFinish("architect_long", runErr)
 
 	if len(events) != 2 {
-		t.Fatalf("start + failed update 应只有 2 个原始事件，got %d: %+v", len(events), events)
+		t.Fatalf("start + failed update phải chỉ có 2 sự kiện gốc, got %d: %+v", len(events), events)
 	}
 	start, failed := events[0], events[1]
 	if !strings.Contains(start.Detail, "需要生成分层大纲") || !strings.Contains(start.Detail, "规划长篇小说") {
-		t.Fatalf("DISPATCH 开始日志应保留完整原因与任务: %+v", start)
+		t.Fatalf("Log bắt đầu DISPATCH phải giữ nguyên vẹn lý do và nhiệm vụ: %+v", start)
 	}
 	if failed.ID != start.ID || failed.Category != "DISPATCH" || !failed.Failed || failed.Level != "error" {
-		t.Fatalf("失败应原地更新 DISPATCH: start=%+v failed=%+v", start, failed)
+		t.Fatalf("Thất bại phải cập nhật DISPATCH tại chỗ: start=%+v failed=%+v", start, failed)
 	}
 	if failed.Detail != runErr.Error() || failed.Kind != "network" || !strings.Contains(failed.Summary, "INTERNAL_ERROR") {
-		t.Fatalf("DISPATCH 应携带完整错误和分类: %+v", failed)
+		t.Fatalf("DISPATCH phải mang lỗi và phân loại đầy đủ: %+v", failed)
 	}
 }
 
@@ -183,17 +183,17 @@ func TestObserverToolErrorUpdatesSingleToolEventWithFullDetail(t *testing.T) {
 	})
 
 	if len(events) != 2 {
-		t.Fatalf("start + failed update 应只有 2 个原始事件，got %d: %+v", len(events), events)
+		t.Fatalf("start + failed update phải chỉ có 2 sự kiện gốc, got %d: %+v", len(events), events)
 	}
 	start, failed := events[0], events[1]
 	if failed.ID == "" || failed.ID != start.ID || !failed.Failed || failed.Category != "TOOL" || failed.Level != "error" {
-		t.Fatalf("失败事件应原地更新 TOOL 行: start=%+v failed=%+v", start, failed)
+		t.Fatalf("Sự kiện thất bại phải cập nhật dòng TOOL tại chỗ: start=%+v failed=%+v", start, failed)
 	}
 	if !strings.Contains(failed.Summary, "tool argument validation failed") ||
 		!strings.Contains(failed.Detail, fullError) || !strings.Contains(failed.Detail, "<TAIL>") {
-		t.Fatalf("失败事件应同时保留 UI 摘要和完整日志详情: %+v", failed)
+		t.Fatalf("Sự kiện thất bại phải đồng thời giữ tóm tắt UI và chi tiết log đầy đủ: %+v", failed)
 	}
 	if len(failed.Summary) >= len(failed.Detail) {
-		t.Fatalf("UI Summary 应短于完整 Detail: summary=%d detail=%d", len(failed.Summary), len(failed.Detail))
+		t.Fatalf("Summary UI phải ngắn hơn Detail đầy đủ: summary=%d detail=%d", len(failed.Summary), len(failed.Detail))
 	}
 }

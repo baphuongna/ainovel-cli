@@ -102,6 +102,8 @@
   "style": "default"
 
   // (Tùy chọn) Cửa sổ ngữ cảnh toàn cục phiên bản cũ (fallback nếu không cấu hình trong models).
+  // Khi đặt giá trị này (ví dụ: 128000, 200000, 1000000), TỰ ĐỘNG compact context khi agent (architect, writer, editor) đạt ngưỡng.
+  // Áp dụng cho MỌI agent — Architect / Writer / Editor đều được bảo vệ bởi cùng ngưỡng.
   // "context_window": 65536,
 
   // (Tùy chọn) Hạn mức ngân sách tối đa cho một cuốn sách (tính bằng USD).

@@ -76,12 +76,12 @@ func TestRenderEPUB_StructuralInvariants(t *testing.T) {
 		}
 	}
 
-	// container.xml 指向 OEBPS/content.opf
+	// container.xml trỏ tới OEBPS/content.opf
 	if !strings.Contains(files["META-INF/container.xml"], `full-path="OEBPS/content.opf"`) {
 		t.Errorf("container.xml does not point to content.opf")
 	}
 
-	// content.opf 必含 metadata + manifest + spine 三大块；spine 顺序 = 章节顺序
+	// content.opf bắt buộc có 3 khối metadata + manifest + spine; thứ tự spine = thứ tự chương
 	opf := files["OEBPS/content.opf"]
 	for _, want := range []string{
 		"<metadata", "</metadata>",
@@ -103,9 +103,9 @@ func TestRenderEPUB_StructuralInvariants(t *testing.T) {
 		t.Errorf("spine order wrong: ch001=%d ch002=%d", idx1, idx2)
 	}
 
-	// 章节 XHTML 含标题 + 段落 + 转义；首行 markdown 标题已剥
+	// XHTML chương chứa tiêu đề + đoạn văn + escape; dòng đầu tiêu đề markdown đã bị bỏ
 	ch1 := files["OEBPS/chapter001.xhtml"]
-	if !strings.Contains(ch1, "第 1 章 雨夜归人") {
+	if !strings.Contains(ch1, "Chương 1 雨夜归人") {
 		t.Errorf("chapter1 missing display title")
 	}
 	if !strings.Contains(ch1, "<p>他望着窗外。</p>") {
@@ -118,7 +118,7 @@ func TestRenderEPUB_StructuralInvariants(t *testing.T) {
 		t.Errorf("chapter1 should have stripped markdown header: %s", ch1)
 	}
 
-	// nav.xhtml 列出所有章节
+	// nav.xhtml liệt kê tất cả các chương
 	nav := files["OEBPS/nav.xhtml"]
 	if !strings.Contains(nav, `epub:type="toc"`) {
 		t.Errorf("nav missing epub:type=toc")
@@ -130,7 +130,7 @@ func TestRenderEPUB_StructuralInvariants(t *testing.T) {
 
 func TestRenderEPUB_HTMLEscape(t *testing.T) {
 	data, err := renderEPUB(
-		domain.BookMetadata{Title: "A & B", Synopsis: "E < F & G"}, // 特殊字符必须转义
+		domain.BookMetadata{Title: "A & B", Synopsis: "E < F & G"}, // ký tự đặc biệt phải được escape
 		[]int{1},
 		chapterTitleIndex{1: "C \"D\""},
 		nil,
@@ -162,7 +162,7 @@ func TestRenderEPUB_HTMLEscape(t *testing.T) {
 	}
 }
 
-// TestRenderEPUB_LayeredVolume 验证分层大纲只在卷首插卷分隔，弧分隔永不出现。
+// TestRenderEPUB_LayeredVolume xác nhận dàn ý phân tầng chỉ chèn phân cách tập ở đầu tập, phân cách cung không bao giờ xuất hiện.
 func TestRenderEPUB_LayeredVolume(t *testing.T) {
 	locs := map[int]chapterLocation{
 		1: {VolumeIdx: 1, VolumeTitle: "起源", IsFirstOfVolume: true},
@@ -188,7 +188,7 @@ func TestRenderEPUB_LayeredVolume(t *testing.T) {
 	}
 
 	ch1 := files["OEBPS/chapter001.xhtml"]
-	if !strings.Contains(ch1, `class="volume-divider"`) || !strings.Contains(ch1, "第 1 卷 起源") {
+	if !strings.Contains(ch1, `class="volume-divider"`) || !strings.Contains(ch1, "Tập 1 起源") {
 		t.Errorf("ch1 should have volume divider: %s", ch1)
 	}
 	if strings.Contains(ch1, `class="arc-divider"`) {
@@ -217,7 +217,7 @@ func TestRenderEPUB_NoCoverWhenNoTitle(t *testing.T) {
 			t.Errorf("cover.xhtml should not exist when title is empty")
 		}
 	}
-	// content.opf 不应引用 cover
+	// content.opf không được tham chiếu cover
 	for _, f := range zr.File {
 		if f.Name != "OEBPS/content.opf" {
 			continue
@@ -237,10 +237,10 @@ func TestSplitParagraphs(t *testing.T) {
 		want []string
 	}{
 		{"a\n\nb", []string{"a", "b"}},
-		{"a\n\n\n\nb", []string{"a", "b"}}, // 多空行折叠为一个分隔
-		{"a\nb", []string{"a b"}},          // 段内单换行变空格
-		{"  ", nil},                        // 全空白返回 nil
-		{"a\r\n\r\nb", []string{"a", "b"}}, // CRLF 兼容
+		{"a\n\n\n\nb", []string{"a", "b"}}, // nhiều dòng trống gộp thành một lượt cắt đoạn
+		{"a\nb", []string{"a b"}},          // một \n trong đoạn biến thành khoảng trắng
+		{"  ", nil},                        // toàn khoảng trắng trả về nil
+		{"a\r\n\r\nb", []string{"a", "b"}}, // tương thích CRLF
 	}
 	for _, c := range cases {
 		got := splitParagraphs(c.in)
@@ -251,7 +251,7 @@ func TestSplitParagraphs(t *testing.T) {
 }
 
 func TestBookIdentifier_StableAcrossChapterRanges(t *testing.T) {
-	// 同名作品、不同导出范围必须返回同一 ID — 阅读器才能识别为"更新版本"
+	// Tác phẩm cùng tên, phạm vi xuất khác nhau phải trả cùng một ID — trình đọc mới nhận ra "phiên bản cập nhật"
 	idFull := bookIdentifier("光斑")
 	idAgain := bookIdentifier("光斑")
 	if idFull != idAgain {

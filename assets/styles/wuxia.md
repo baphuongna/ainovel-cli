@@ -12,5 +12,5 @@
 - **Tiến cấp phải cảm nhận được, không chỉ được thông báo**: Mỗi lần lên cảnh giới phải lập tức mở ra một việc trước đó không làm nổi. Cấm kiểu "ba tháng sau hắn đã đột phá" rồi đi tiếp.
 - **Nhục thân và khí huyết là ngôn ngữ tả**: Sức mạnh biểu hiện qua thân thể (khí huyết, gân cốt, hơi thở, sức nặng của đòn), không qua tính từ trừu tượng.
 - **Phàm nhân lưu — thế giới không xoay quanh nhân vật chính**: Gia đình, tiền bạc, thân phận, loạn thế vẫn đè lên vai. Sức mạnh cá nhân không xóa được áp lực xã hội; nó chỉ đổi hình dạng áp lực đó.
-- **Xưng hô và ngữ vực cổ trang**: Giữ hệ thống xưng hô nhất quán (hắn/ta/ngươi, gia gia, sư phụ, đệ tử). Tuyệt đối không để từ ngữ hiện đại hay giọng mạng lọt vào lời kể và thoại.
+- **Xưng hô và ngữ vực cổ trang**: Giữ hệ thống xưng hô nhất quán (hắn/ta/ngươi, gia gia, sư phụ, đệ tử). Tuyệt đối không để từ ngữ hiện đại hay giọng mạng lọt vào lời kể và thoại. Cấm dùng đại từ anh/em/bạn/mày/cậu trong bối cảnh tu tiên. Hãy tuân theo world_rules.
 - **Danh từ riêng là bất khả xâm phạm**: Tên công pháp, cảnh giới, phẩm cấp, thế lực đã định trong world_rules phải dùng nguyên văn, mọi chương, không tự đặt tên thay thế hay biến thể.

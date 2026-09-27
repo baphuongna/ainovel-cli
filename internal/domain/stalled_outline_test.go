@@ -70,7 +70,7 @@ func TestOversizedArcCatchesTwentyChapterArc(t *testing.T) {
 		t.Fatal("cung 20 chương phải bị bác")
 	}
 	for _, want := range []string{"20", "8", "tách"} {
-		if !strings.Contains(got, want) && !strings.Contains(got, "拆") {
+		if !strings.Contains(got, want) {
 			t.Errorf("chẩn đoán thiếu thông tin %q: %s", want, got)
 		}
 	}

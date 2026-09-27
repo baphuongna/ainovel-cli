@@ -170,7 +170,7 @@ func TestGradeDeltaStylestatWarnAndBlock(t *testing.T) {
 	if d.Outcome != Warn {
 		t.Fatalf("stylestat 回归默认应 WARN，得到 %s", d.Outcome)
 	}
-	if !hasIssue(d.Warnings, "delta:stylestat", "文体指标回归") {
+	if !hasIssue(d.Warnings, "delta:stylestat", "hồi quy chỉ số văn phong") {
 		t.Fatalf("应报告 stylestat warning，实际 %+v", d.Warnings)
 	}
 
@@ -179,7 +179,7 @@ func TestGradeDeltaStylestatWarnAndBlock(t *testing.T) {
 	if d.Outcome != Fail {
 		t.Fatalf("stylestat block 应 FAIL，得到 %s", d.Outcome)
 	}
-	if !hasIssue(d.HardFails, "delta:stylestat", "文体指标回归") {
+	if !hasIssue(d.HardFails, "delta:stylestat", "hồi quy chỉ số văn phong") {
 		t.Fatalf("应报告 stylestat hard fail，实际 %+v", d.HardFails)
 	}
 }
@@ -221,10 +221,10 @@ func TestGradeDeltaCostAndToolCallThresholds(t *testing.T) {
 	if d.Outcome != Warn {
 		t.Fatalf("成本/tool_calls 超阈值应 WARN，得到 %s", d.Outcome)
 	}
-	if !hasIssue(d.Warnings, "delta:tool_calls", "超过阈值") {
+	if !hasIssue(d.Warnings, "delta:tool_calls", "vượt ngưỡng") {
 		t.Fatalf("应报告 tool_calls 回归，实际 %+v", d.Warnings)
 	}
-	if !hasIssue(d.Warnings, "delta:cost", "超过阈值") {
+	if !hasIssue(d.Warnings, "delta:cost", "vượt ngưỡng") {
 		t.Fatalf("应报告 cost 回归，实际 %+v", d.Warnings)
 	}
 }
@@ -234,7 +234,7 @@ func TestGradeDeltaInsufficientStylestatIsNote(t *testing.T) {
 	if d.Outcome != Pass {
 		t.Fatalf("样本不足不应改变门禁，得到 %s", d.Outcome)
 	}
-	if !hasIssue(d.Notes, "stylestat", "样本不足") {
+	if !hasIssue(d.Notes, "stylestat", "mẫu không đủ") {
 		t.Fatalf("应记录 stylestat 样本不足 note，实际 %+v", d.Notes)
 	}
 }

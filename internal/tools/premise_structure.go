@@ -6,25 +6,47 @@ import (
 	"github.com/voocel/ainovel-cli/internal/domain"
 )
 
+// premiseHeadingAliases chuẩn hoá mọi biến thể heading về key chuẩn tiếng Việt
+// (ngôn ngữ mặc định của sản phẩm; key xuất hiện trong premise_sections và
+// premise_structure của novel_context — ngữ cảnh model đọc). Biến thể gồm:
+//   - heading tiếng Việt đúng từng chữ mà prompt architect-short/long yêu cầu;
+//   - heading tiếng Trung cho sách zh / premise viết trước khi Việt hoá.
 var premiseHeadingAliases = map[string]string{
-	"题材定位":    "题材定位",
-	"题材和基调":   "题材和基调",
-	"核心冲突":    "核心冲突",
-	"主角目标":    "主角目标",
-	"结局方向":    "终局方向",
-	"终局方向":    "终局方向",
-	"写作禁区":    "写作禁区",
-	"差异化卖点":   "差异化卖点",
-	"差异化钩子":   "差异化钩子",
-	"核心兑现承诺":  "核心兑现承诺",
-	"故事引擎":    "故事引擎",
-	"关系/成长主线": "关系/成长主线",
-	"升级路径":    "升级路径",
-	"中段转折":    "中段转折",
-	"中期转向":    "中段转折",
-	"终局命题":    "终局命题",
-	"短篇适配性":   "短篇适配性",
-	"本作为什么适合短篇/单卷收束": "短篇适配性",
+	// Tiếng Việt (mặc định).
+	"Thể loại và giọng điệu":       "Thể loại và giọng điệu",
+	"Định vị thể loại":             "Định vị thể loại",
+	"Xung đột cốt lõi":             "Xung đột cốt lõi",
+	"Mục tiêu nhân vật chính":      "Mục tiêu nhân vật chính",
+	"Hướng kết cục":                "Hướng kết cục",
+	"Vùng cấm sáng tác":            "Vùng cấm sáng tác",
+	"Điểm bán hàng khác biệt":      "Điểm bán hàng khác biệt",
+	"Móc câu khác biệt":            "Móc câu khác biệt",
+	"Cam kết cốt lõi":              "Cam kết cốt lõi",
+	"Động cơ câu chuyện":           "Động cơ câu chuyện",
+	"Tuyến quan hệ/trưởng thành":   "Tuyến quan hệ/trưởng thành",
+	"Lộ trình nâng cấp":            "Lộ trình nâng cấp",
+	"Chuyển hướng trung kỳ":        "Chuyển hướng trung kỳ",
+	"Mệnh đề kết cục":              "Mệnh đề kết cục",
+	"Tính phù hợp với truyện ngắn": "Tính phù hợp với truyện ngắn",
+	// Tiếng Trung (sách zh / premise cũ).
+	"题材和基调":   "Thể loại và giọng điệu",
+	"题材定位":    "Định vị thể loại",
+	"核心冲突":    "Xung đột cốt lõi",
+	"主角目标":    "Mục tiêu nhân vật chính",
+	"结局方向":    "Hướng kết cục",
+	"终局方向":    "Hướng kết cục",
+	"写作禁区":    "Vùng cấm sáng tác",
+	"差异化卖点":   "Điểm bán hàng khác biệt",
+	"差异化钩子":   "Móc câu khác biệt",
+	"核心兑现承诺":  "Cam kết cốt lõi",
+	"故事引擎":    "Động cơ câu chuyện",
+	"关系/成长主线": "Tuyến quan hệ/trưởng thành",
+	"升级路径":    "Lộ trình nâng cấp",
+	"中段转折":    "Chuyển hướng trung kỳ",
+	"中期转向":    "Chuyển hướng trung kỳ",
+	"终局命题":    "Mệnh đề kết cục",
+	"短篇适配性":   "Tính phù hợp với truyện ngắn",
+	"本作为什么适合短篇/单卷收束": "Tính phù hợp với truyện ngắn",
 }
 
 func parsePremiseSections(premise string) map[string]string {
@@ -67,8 +89,20 @@ func canonicalPremiseHeading(line string) (string, bool) {
 	if title == "" {
 		return "", false
 	}
-	canonical, ok := premiseHeadingAliases[title]
-	return canonical, ok
+	if canonical, ok := premiseHeadingAliases[title]; ok {
+		return canonical, true
+	}
+	// Prompt architect-long liệt kê heading kèm chú thích dạng "Tên (chú thích)"
+	// hoặc "Tên: giải thích" — model có thể viết nguyên cả cụm thành heading;
+	// bỏ phần chú thích rồi tra lại.
+	for _, sep := range []string{" (", ": ", "："} {
+		if i := strings.Index(title, sep); i > 0 {
+			if canonical, ok := premiseHeadingAliases[strings.TrimSpace(title[:i])]; ok {
+				return canonical, true
+			}
+		}
+	}
+	return "", false
 }
 
 func premiseStructure(premise string, tier domain.PlanningTier) map[string]any {
@@ -97,34 +131,34 @@ func premiseStructure(premise string, tier domain.PlanningTier) map[string]any {
 
 func requiredPremiseHeadings(tier domain.PlanningTier) []string {
 	common := []string{
-		"题材和基调",
-		"题材定位",
-		"核心冲突",
-		"主角目标",
-		"终局方向",
-		"写作禁区",
-		"差异化卖点",
-		"差异化钩子",
-		"核心兑现承诺",
+		"Thể loại và giọng điệu",
+		"Định vị thể loại",
+		"Xung đột cốt lõi",
+		"Mục tiêu nhân vật chính",
+		"Hướng kết cục",
+		"Vùng cấm sáng tác",
+		"Điểm bán hàng khác biệt",
+		"Móc câu khác biệt",
+		"Cam kết cốt lõi",
 	}
 
 	switch tier {
 	case domain.PlanningTierLong:
 		return append(common,
-			"故事引擎",
-			"关系/成长主线",
-			"升级路径",
-			"中段转折",
-			"终局命题",
+			"Động cơ câu chuyện",
+			"Tuyến quan hệ/trưởng thành",
+			"Lộ trình nâng cấp",
+			"Chuyển hướng trung kỳ",
+			"Mệnh đề kết cục",
 		)
 	case domain.PlanningTierMid:
 		return append(common,
-			"故事引擎",
-			"中段转折",
+			"Động cơ câu chuyện",
+			"Chuyển hướng trung kỳ",
 		)
 	case domain.PlanningTierShort:
 		return append(common,
-			"短篇适配性",
+			"Tính phù hợp với truyện ngắn",
 		)
 	default:
 		return common

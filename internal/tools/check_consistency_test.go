@@ -25,13 +25,13 @@ func TestCheckConsistencyReturnsPartialFactsWithWarnings(t *testing.T) {
 
 	raw, err := NewCheckConsistencyTool(st).Execute(context.Background(), json.RawMessage(`{"chapter":1}`))
 	if err != nil {
-		t.Fatalf("辅助事实损坏不应中止一致性检查: %v", err)
+		t.Fatalf("dữ liệu phụ bị hỏng không được làm gián đoạn kiểm tra nhất quán: %v", err)
 	}
 	var got map[string]any
 	if err := json.Unmarshal(raw, &got); err != nil {
 		t.Fatal(err)
 	}
 	if got["status"] != "partial" || len(got["_warnings"].([]any)) == 0 || got["content"] == "" {
-		t.Fatalf("应返回正文、partial 和数据告警: %+v", got)
+		t.Fatalf("phải trả về nội dung, partial và cảnh báo dữ liệu: %+v", got)
 	}
 }

@@ -10,8 +10,8 @@ import (
 	"github.com/voocel/agentcore"
 )
 
-// TestSessionStore_MetaInjected_AssistantWithUsage 验证只有"assistant + has Usage"
-// 的消息才被附加 _meta，这是 replay 路径精确算价的前提。
+// TestSessionStore_MetaInjected_AssistantWithUsage xác minh chỉ thông điệp "assistant + có Usage"
+// mới được gắn _meta, đây là tiền đề để đường dẫn replay tính giá chính xác.
 func TestSessionStore_MetaInjected_AssistantWithUsage(t *testing.T) {
 	dir := t.TempDir()
 	s := NewSessionStore(newIO(dir))
@@ -32,7 +32,7 @@ func TestSessionStore_MetaInjected_AssistantWithUsage(t *testing.T) {
 	})
 	logger("writer", "写第 1 章", agentcore.Message{
 		Role:  agentcore.RoleAssistant,
-		Usage: nil, // assistant 但无 usage（流式未带 final usage chunk）
+		Usage: nil, // assistant nhưng không có usage (stream không kèm final usage chunk)
 	})
 
 	entries := readJSONL(t, filepath.Join(dir, "meta/sessions/agents/writer-ch01.jsonl"))
@@ -54,8 +54,9 @@ func TestSessionStore_MetaInjected_AssistantWithUsage(t *testing.T) {
 	}
 }
 
-// TestSessionStore_MetaModelSwitch 验证运行中切换模型后，后续消息的 _meta 也跟着变。
-// 这是 B 方案对"同进程内 /model 切换"的精确支持。
+// TestSessionStore_MetaModelSwitch xác minh sau khi đổi model khi đang chạy, _meta của các thông
+// điệp sau đó cũng đổi theo. Đây là hỗ trợ chính xác của phương án B cho việc chuyển /model
+// trong cùng tiến trình.
 func TestSessionStore_MetaModelSwitch(t *testing.T) {
 	dir := t.TempDir()
 	s := NewSessionStore(newIO(dir))
@@ -67,7 +68,7 @@ func TestSessionStore_MetaModelSwitch(t *testing.T) {
 	logger := s.SubAgentLogger(lookup)
 
 	logger("writer", "写第 1 章", makeAssistantWithUsage())
-	current = "model-b" // 模拟 /model 切换
+	current = "model-b" // mô phỏng chuyển /model
 	logger("writer", "写第 1 章", makeAssistantWithUsage())
 
 	entries := readJSONL(t, filepath.Join(dir, "meta/sessions/agents/writer-ch01.jsonl"))
@@ -85,8 +86,8 @@ func TestSessionStore_MetaModelSwitch(t *testing.T) {
 	}
 }
 
-// TestSessionStore_NilLookup 验证 lookup=nil 时写入仍然正常，
-// 只是不带 _meta。
+// TestSessionStore_NilLookup xác minh khi lookup=nil việc ghi vẫn bình thường,
+// chỉ là không kèm _meta.
 func TestSessionStore_NilLookup(t *testing.T) {
 	dir := t.TempDir()
 	s := NewSessionStore(newIO(dir))
@@ -104,7 +105,7 @@ func TestSessionStore_NilLookup(t *testing.T) {
 	if _, has := entries[0]["_meta"]; has {
 		t.Errorf("nil lookup should not produce _meta")
 	}
-	// 但其他字段（role/usage）必须正常
+	// Nhưng các trường khác (role/usage) phải bình thường
 	if entries[0]["role"] != "assistant" {
 		t.Errorf("role lost: %v", entries[0]["role"])
 	}

@@ -22,10 +22,12 @@ func TestStoreSummaryCompactApplyUsesPersistentStoreData(t *testing.T) {
 	})
 
 	msgs := []agentcore.AgentMessage{
-		agentcore.UserMsg(strings.Repeat("旧上下文", 80)),
+		// Fixture đủ lớn để bản tóm tắt tiếng Việt (dài hơn tiếng Trung ~1.5–2×)
+		// vẫn tiết kiệm token — nếu không, guard "chỉ nén khi lợi" sẽ từ chối apply.
+		agentcore.UserMsg(strings.Repeat("旧上下文", 200)),
 		agentcore.Message{
 			Role:    agentcore.RoleAssistant,
-			Content: []agentcore.ContentBlock{agentcore.TextBlock(strings.Repeat("旧回复", 80))},
+			Content: []agentcore.ContentBlock{agentcore.TextBlock(strings.Repeat("旧回复", 200))},
 		},
 		agentcore.UserMsg("继续写第三章，注意承接第二章结尾。"),
 		agentcore.Message{
@@ -55,16 +57,16 @@ func TestStoreSummaryCompactApplyUsesPersistentStoreData(t *testing.T) {
 	if !ok {
 		t.Fatalf("expected ContextSummary, got %T", out[0])
 	}
-	if !strings.Contains(summary.Summary, "最近章节摘要") {
+	if !strings.Contains(summary.Summary, "Tóm tắt chương gần đây") {
 		t.Fatalf("expected persistent summaries in checkpoint, got %q", summary.Summary)
 	}
-	if !strings.Contains(summary.Summary, "当前章节计划") {
+	if !strings.Contains(summary.Summary, "Kế hoạch chương hiện tại") {
 		t.Fatalf("expected chapter plan in checkpoint, got %q", summary.Summary)
 	}
-	if !strings.Contains(summary.Summary, "活跃伏笔") {
+	if !strings.Contains(summary.Summary, "Phục bút đang hoạt động") {
 		t.Fatalf("expected foreshadow data in checkpoint, got %q", summary.Summary)
 	}
-	if !strings.Contains(summary.Summary, "待修审稿问题") {
+	if !strings.Contains(summary.Summary, "Vấn đề xem xét cần sửa") {
 		t.Fatalf("expected pending review section in checkpoint, got %q", summary.Summary)
 	}
 	if !strings.Contains(summary.Summary, "仓库线索需要再蓄压一拍") {
@@ -83,10 +85,10 @@ func TestWriterRestoreIncludesOptionalDataWarnings(t *testing.T) {
 
 	text, ok, err := buildWriterRestoreText(s, restoreBudgetTokens)
 	if err != nil {
-		t.Fatalf("辅助数据损坏不应阻止恢复上下文: %v", err)
+		t.Fatalf("dữ liệu phụ bị hỏng không được ngăn khôi phục ngữ cảnh: %v", err)
 	}
-	if !ok || !strings.Contains(text, "数据告警") || !strings.Contains(text, "style_rules") {
-		t.Fatalf("恢复上下文应向模型暴露读取告警: %q", text)
+	if !ok || !strings.Contains(text, "Cảnh báo dữ liệu") || !strings.Contains(text, "style_rules") {
+		t.Fatalf("ngữ cảnh khôi phục phải expose cảnh báo đọc cho model: %q", text)
 	}
 }
 
@@ -146,10 +148,10 @@ func TestWriterRestorePackRefreshReusesStoreBuilder(t *testing.T) {
 	if !strings.Contains(text, "<post-compact-context>") {
 		t.Fatalf("expected wrapped restore context, got %q", text)
 	}
-	if !strings.Contains(text, "待修审稿问题") {
+	if !strings.Contains(text, "Vấn đề xem xét cần sửa") {
 		t.Fatalf("expected pending review section, got %q", text)
 	}
-	if !strings.Contains(text, "当前章节计划") {
+	if !strings.Contains(text, "Kế hoạch chương hiện tại") {
 		t.Fatalf("expected chapter plan section, got %q", text)
 	}
 

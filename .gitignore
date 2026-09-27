@@ -54,3 +54,10 @@ config/
 scratch/
 config-laptop/
 workspace-laptop/
+
+/.crew/
+/.crew
+!.crew/artifacts/
+!.crew/graphs/
+!.crew/artifacts/.gitkeep
+!.crew/graphs/.gitkeep

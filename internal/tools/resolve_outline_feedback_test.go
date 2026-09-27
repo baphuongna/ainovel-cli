@@ -29,6 +29,6 @@ func TestResolveOutlineFeedbackClearsReviewedFeedback(t *testing.T) {
 		t.Fatalf("feedback=%+v err=%v", feedback, err)
 	}
 	if checkpoint := st.Checkpoints.LatestByStep(domain.GlobalScope(), "resolve_outline_feedback"); checkpoint == nil {
-		t.Fatal("缺少反馈处理 checkpoint")
+		t.Fatal("thiếu checkpoint xử lý phản hồi")
 	}
 }

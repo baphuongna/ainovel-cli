@@ -1,11 +1,13 @@
 package store
 
-// mdLabels 是派生 Markdown 视图里的固定标签。
+// mdLabels là các nhãn cố định trong view Markdown dẫn xuất.
 //
-// 这些 .md 会被 novel_context 读回模型上下文，因此标签语种不只是显示问题：
-// 越南语正文里每章顶着「第 N 章」「核心事件」，等于持续暗示模型当前是中文语境，
-// 实测导致正文夹带汉字（quan sát草木 / Bạo虐 / 顿号）。标签跟随作品语种，
-// 才不会和模型的输出语种互相拉扯。
+// Những .md này được novel_context đọc lại vào ngữ cảnh model, nên ngôn ngữ nhãn
+// không chỉ là chuyện hiển thị: chính văn tiếng Việt mà mỗi chương vẫn đội nhãn kiểu
+// "第 N 章", "核心事件" (nhãn tiếng Trung) thì chẳng khác nào liên tục ám chỉ model
+// đang ở ngữ cảnh tiếng Trung, quan sát thực tế cho thấy khiến chính văn lẫn chữ Hán
+// (quan sát草木 / Bạo虐 / dấu顿号 kiểu hỗn hợp). Nhãn phải theo ngôn ngữ tác phẩm thì
+// mới không kéo co với ngôn ngữ đầu ra của model.
 type mdLabels struct {
 	bookTitleFmt string
 	synopsis     string
@@ -29,15 +31,15 @@ type mdLabels struct {
 	hook           string
 	scenes         string
 
-	timeline         string
-	foreshadow       string
-	resolvedAtFmt    string
-	plantedAtFmt     string
-	relationships    string
-	atChapterFmt     string
-	worldRules       string
-	rule             string
-	boundary         string
+	timeline      string
+	foreshadow    string
+	resolvedAtFmt string
+	plantedAtFmt  string
+	relationships string
+	atChapterFmt  string
+	worldRules    string
+	rule          string
+	boundary      string
 }
 
 var labelsZH = mdLabels{
@@ -55,7 +57,7 @@ var labelsZH = mdLabels{
 	worldRules: "世界观规则", rule: "规则", boundary: "边界",
 }
 
-// labelsVI 用项目既定译名：tập / cung / chương / đề cương / điểm móc / phục bút。
+// labelsVI dùng tên dịch đã định của dự án: tập / cung / chương / đề cương / điểm móc / phục bút.
 var labelsVI = mdLabels{
 	bookTitleFmt: "%s", synopsis: "Giới thiệu", charProfiles: "Hồ sơ nhân vật", charArc: "Cung nhân vật",
 	traits: "Đặc điểm", listSep: ", ", openParen: " (", closeParen: ")", colon: ": ",

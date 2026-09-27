@@ -10,6 +10,7 @@ import (
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/charmbracelet/lipgloss"
 	"github.com/voocel/ainovel-cli/internal/rules"
+	"github.com/voocel/ainovel-cli/internal/styles"
 	"github.com/voocel/ainovel-cli/internal/utils"
 )
 
@@ -100,7 +101,14 @@ func RunSetup() (Config, error) {
 	}
 	printStepDone("Ngôn ngữ sáng tác", selectedLang.label)
 
-	// Step 2: Chọn Nhà cung cấp AI (Provider)
+	// Step 2: Chọn Thể loại / Phong cách truyện
+	selectedStyle, err := runStyleSelect()
+	if err != nil {
+		return Config{}, err
+	}
+	printStepDone("Thể loại", selectedStyle.Label)
+
+	// Step 3: Chọn Nhà cung cấp AI (Provider)
 	sp, err := runProviderSelect()
 	if err != nil {
 		return Config{}, err
@@ -123,12 +131,12 @@ func RunSetup() (Config, error) {
 		pc.Type = providerType
 	}
 
-	// Step 3: Nhập API Key
+	// Step 4: Nhập API Key
 	var apiKey string
 	if sp.apiKeyOptional {
-		apiKey, err = runOptionalTextInput("[3/5] API Key (Nhấn Enter để bỏ qua nếu dùng Ollama/Local)", "Để trống nếu không cần API Key")
+		apiKey, err = runOptionalTextInput("[4/6] API Key (Nhấn Enter để bỏ qua nếu dùng Ollama/Local)", "Để trống nếu không cần API Key")
 	} else {
-		apiKey, err = runTextInput("[3/5] API Key", "sk-xxx...")
+		apiKey, err = runTextInput("[4/6] API Key", "sk-xxx...")
 	}
 	if err != nil {
 		return Config{}, err
@@ -140,13 +148,13 @@ func RunSetup() (Config, error) {
 		printStepDone("API Key", maskKey(apiKey))
 	}
 
-	// Step 4: Base URL (Nhấn Enter để dùng mặc định)
+	// Step 5: Base URL (Nhấn Enter để dùng mặc định)
 	baseDefault := sp.baseURL
 	baseHint := "Để trống dùng địa chỉ mặc định"
 	if baseDefault != "" {
 		baseHint = baseDefault
 	}
-	baseURL, err := runTextInputWithDefault("[4/5] Base URL (Nhấn Enter để dùng địa chỉ mặc định, hoặc nhập địa chỉ proxy/Ollama)", baseHint, baseDefault)
+	baseURL, err := runTextInputWithDefault("[5/6] Base URL (Nhấn Enter để dùng địa chỉ mặc định, hoặc nhập địa chỉ proxy/Ollama)", baseHint, baseDefault)
 	if err != nil {
 		return Config{}, err
 	}
@@ -157,12 +165,12 @@ func RunSetup() (Config, error) {
 		printStepDone("Base URL", "Mặc định")
 	}
 
-	// Step 5: Tên Model (bắt buộc)
+	// Step 6: Tên Model (bắt buộc)
 	modelPlaceholder := "Ví dụ: qwen2.5:14b / ainovel-qwen / google/gemini-2.5-flash / claude-3-5-sonnet"
 	if providerName == "ollama" {
 		modelPlaceholder = "Ví dụ: qwen2.5:14b / ainovel-qwen / qwen3:14b"
 	}
-	modelName, err := runTextInput("[5/5] Tên Model chính", modelPlaceholder)
+	modelName, err := runTextInput("[6/6] Tên Model chính", modelPlaceholder)
 	if err != nil {
 		return Config{}, err
 	}
@@ -174,7 +182,7 @@ func RunSetup() (Config, error) {
 		ModelName: modelName,
 		Providers: map[string]ProviderConfig{providerName: pc},
 		Roles:     map[string]RoleConfig{},
-		Style:     "default",
+		Style:     selectedStyle.Key,
 		Language:  selectedLang.code,
 	}
 
@@ -193,6 +201,7 @@ func RunSetup() (Config, error) {
 	fmt.Fprintf(os.Stderr, "%s Cấu hình đã được lưu tại: %s\n",
 		lipgloss.NewStyle().Foreground(lipgloss.Color("42")).Render("✓"), path)
 	fmt.Fprintf(os.Stderr, "  Ngôn ngữ truyện: %s\n", selectedLang.label)
+	fmt.Fprintf(os.Stderr, "  Thể loại truyện: %s\n", selectedStyle.Label)
 	fmt.Fprintf(os.Stderr, "  Provider mặc định: %s\n", providerName)
 	fmt.Fprintf(os.Stderr, "  Model mặc định: %s\n", modelName)
 	fmt.Fprintln(os.Stderr, "  Bạn có thể dùng lệnh /config hoặc /model trong TUI để thay đổi bất cứ lúc nào.")
@@ -235,7 +244,7 @@ func runLanguageSelect() (setupLanguageOption, error) {
 		items[i] = setupProvider{name: opt.code, label: opt.label}
 	}
 	m := setupSelectModel{
-		title: "[1/5] Chọn Ngôn Ngữ Sáng Tác Nội Dung Truyện (Giao diện luôn là Tiếng Việt)",
+		title: "[1/6] Chọn Ngôn Ngữ Sáng Tác Nội Dung Truyện (Giao diện luôn là Tiếng Việt)",
 		items: items,
 	}
 	p := tea.NewProgram(m, tea.WithOutput(os.Stderr))
@@ -250,9 +259,39 @@ func runLanguageSelect() (setupLanguageOption, error) {
 	return languageOptions[result.cursor], nil
 }
 
+// styleSelectItems dựng danh sách mục chọn thể loại cho setupSelectModel.
+// name giữ style key bền vững (lưu vào config), label hiển thị "Nhãn — Mô tả" tiếng Việt.
+// Thứ tự items phải khớp đúng styles.StyleOptions vì runStyleSelect lấy kết quả theo index cursor.
+func styleSelectItems() []setupProvider {
+	items := make([]setupProvider, len(styles.StyleOptions))
+	for i, opt := range styles.StyleOptions {
+		items[i] = setupProvider{name: opt.Key, label: opt.Label + " — " + opt.Description}
+	}
+	return items
+}
+
+// runStyleSelect hiển thị bước chọn thể loại; trả về StyleOption đầy đủ
+// (Key để lưu config, Label để in tóm tắt) theo mẫu runLanguageSelect.
+func runStyleSelect() (styles.StyleOption, error) {
+	m := setupSelectModel{
+		title: "[2/6] Chọn Thể Loại Truyện (Quyết định phong cách prompt và bộ quy tắc viết)",
+		items: styleSelectItems(),
+	}
+	p := tea.NewProgram(m, tea.WithOutput(os.Stderr))
+	final, err := p.Run()
+	if err != nil {
+		return styles.StyleOption{}, err
+	}
+	result := final.(setupSelectModel)
+	if result.cancelled {
+		return styles.StyleOption{}, fmt.Errorf("đã hủy khởi tạo")
+	}
+	return styles.StyleOptions[result.cursor], nil
+}
+
 func runProviderSelect() (setupProvider, error) {
 	m := setupSelectModel{
-		title: "[2/5] Chọn Nhà Cung Cấp AI (Provider)",
+		title: "[3/6] Chọn Nhà Cung Cấp AI (Provider)",
 		items: setupProviders,
 	}
 	p := tea.NewProgram(m, tea.WithOutput(os.Stderr))

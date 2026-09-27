@@ -8,20 +8,27 @@ import (
 )
 
 var (
-	// 章号写法按语种三选一：越南语「Chương 12」、中文「第 12 章」、英文「Chapter 12」。
+	// Cách viết số chương chọn một trong ba ngôn ngữ: tiếng Việt "Chương 12", tiếng Trung "第 12 章", tiếng Anh "Chapter 12".
 	chapterNumberRe = regexp.MustCompile(`^\s*(?i:(chương|chapter)\s*(\d+)|第\s*(\d+)\s*章)`)
 
-	// 模型给出的首行标题装饰：# 到 ###### 的标题行，或整行 **加粗**。
+	// Trang trí tiêu đề dòng đầu do model đưa ra: dòng đề mục từ # đến ######, hoặc cả dòng **in đậm**.
 	headingDecorRe = regexp.MustCompile(`^\s*(?:#{1,6}\s*|\*\*)\s*|\s*\*\*\s*$`)
+
+	// Tiền tố số chương đứng đầu TÊN chương (khác với dòng đề mục trong chính văn): dùng bóc phần chữ
+	// thuần túy của tên chương trước khi engine tự đóng số chương theo ngôn ngữ. Rộng hơn chapterNumberRe
+	// một bậc: nuốt luôn dấu phân cách theo sau (":"/"："/gạch/điểm), và chấp nhận cả số Hán (第一章)
+	// để không nhân đôi thành "第 1 章: 第一章" khi tên chương vốn chỉ là số chương.
+	chapterTitlePrefixRe = regexp.MustCompile(`^\s*(?i:(?:chương|chapter)\s*\d+|第\s*[0-9一二三四五六七八九十百千零两]+\s*章)\s*[:：.、\-—–]?\s*`)
 )
 
-// FixChapterNumber 把标题里的章号改写成真实章号。
+// FixChapterNumber đổi số chương trong tiêu đề thành số chương thật.
 //
-// 实测事故：规划期生成的大纲把章节命名为「Chương 19..23」，落盘时实际是第 1..5 章，
-// 于是 ChapterRecord 里 chapter=2 而 title="Chương 20"——同一条记录自相矛盾，
-// 读者看到的目录跳号。章号是引擎已知的事实，不该由模型的记忆决定。
+// Sự cố thực đo: dàn ý sinh trong kỳ quy hoạch đặt tên chương là "Chương 19..23", khi lưu
+// xuống đĩa thực tế là chương 1..5, thế là ChapterRecord có chapter=2 mà title="Chương 20"
+// — cùng một bản ghi tự mâu thuẫn, mục lục độc giả thấy bị nhảy số. Số chương là sự kiện
+// engine đã biết, không nên do trí nhớ của model quyết định.
 //
-// 标题不含可识别章号时原样返回：不猜、不硬塞。
+// Tiêu đề không chứa số chương nhận diện được thì trả về nguyên dạng: không đoán, không nhét cứng.
 func FixChapterNumber(title string, chapter int) string {
 	m := chapterNumberRe.FindStringSubmatchIndex(title)
 	if m == nil || chapter <= 0 {
@@ -33,33 +40,69 @@ func FixChapterNumber(title string, chapter int) string {
 			continue
 		}
 		if n, err := strconv.Atoi(title[g[0]:g[1]]); err == nil && n != chapter {
-			// 只换数字，保留原本的写法与大小写（Chương / 第…章 / Chapter）。
+			// Chỉ thay con số, giữ nguyên cách viết và hoa thường gốc (Chương / 第…章 / Chapter).
 			head = head[:g[0]-m[0]] + strconv.Itoa(chapter) + head[g[1]-m[0]:]
 		}
 	}
 	return head + title[m[1]:]
 }
 
-// ApplyChapterHeading 保证正文首行是规范的一级标题。
+// chapterNumberLabel đóng số chương theo ngôn ngữ tác phẩm: vi "Chương N", zh "第 N 章",
+// ngôn ngữ khác (en) về "Chapter N". Giữ đồng bộ định dạng với chapterFmt trong internal/store/labels.go
+// ("Chương %d" / "第 %d 章") — đề mục engine và nhãn store phải gọi chương theo cùng một cách.
+func chapterNumberLabel(lang string, chapter int) string {
+	switch strings.ToLower(strings.TrimSpace(lang)) {
+	case "vi":
+		return fmt.Sprintf("Chương %d", chapter)
+	case "zh":
+		return fmt.Sprintf("第 %d 章", chapter)
+	default:
+		return fmt.Sprintf("Chapter %d", chapter)
+	}
+}
+
+// chapterHeadingText render tên chương hoàn chỉnh: số chương do engine đóng lên đầu, tách khỏi
+// phần chữ thuần túy bằng ": ". Tiêu đề đã kèm tiền tố số ("Chương 4: Bí Mật", "第 20 章 灵草秘密")
+// thì bóc tiền tố ra rồi đóng lại theo đúng ngôn ngữ, tránh lặp "Chương 4: Chương 4:". Tiêu đề
+// chỉ toàn số chương ("Chương 4", "第一章") giữ nguyên — số đã có, phần chữ rỗng.
+func chapterHeadingText(title string, chapter int, lang string) string {
+	if chapter <= 0 {
+		return title
+	}
+	rest := strings.TrimSpace(chapterTitlePrefixRe.ReplaceAllString(title, ""))
+	if rest == "" {
+		return title
+	}
+	return fmt.Sprintf("%s: %s", chapterNumberLabel(lang, chapter), rest)
+}
+
+// ApplyChapterHeading bảo đảm dòng đầu chính văn là đề mục cấp một chuẩn mực, luôn mang số chương
+// theo ngôn ngữ tác phẩm: vi "# Chương N: ...", zh "# 第 N 章: ...", ngôn ngữ khác "# Chapter N: ...".
 //
-// 引擎在 ChapterFacts.Title 里已持有正确标题，却直接把模型输出的正文原样落盘：
-// 实测 15 章里 9 章根本没有标题行，1 章写成 ## 二级，1 章写成 **加粗**。
-// 标题是结构，不是创作——这里统一由引擎渲染，模型写不写都不影响成品。
+// Engine đã giữ đúng tiêu đề trong ChapterFacts.Title, nhưng lại lưu chính văn model xuất ra
+// nguyên dạng xuống đĩa: thực đo 15 chương thì 9 chương hoàn toàn không có dòng tiêu đề, 1 chương
+// viết thành ## cấp hai, 1 chương viết thành **in đậm**. Tiêu đề là cấu trúc, không phải sáng
+// tác — ở đây thống nhất do engine kết xuất, model viết hay không đều không ảnh hưởng thành phẩm.
 //
-// 只在首行确实是标题时才替换它（与 title 相同，或带章号前缀），否则一律前置，
-// 避免把一句以加粗开头的正文误当标题吃掉。
-func ApplyChapterHeading(content, title string, chapter int) string {
+// Chỉ thay dòng đó khi dòng đầu thực sự là đề mục (trùng với title, hoặc mang tiền tố số
+// chương), nếu không thì nhất luật nối vào trước, tránh ăn nhầm một câu chính văn mở đầu bằng in đậm
+// thành tiêu đề.
+func ApplyChapterHeading(content, title string, chapter int, lang string) string {
 	title = strings.TrimSpace(FixChapterNumber(strings.TrimSpace(title), chapter))
 	if title == "" {
 		return content
 	}
+	bareTitle := strings.TrimSpace(chapterTitlePrefixRe.ReplaceAllString(title, ""))
+	heading := chapterHeadingText(title, chapter, lang)
 
 	lines := strings.Split(content, "\n")
 	first := 0
 	for first < len(lines) && strings.TrimSpace(lines[first]) == "" {
 		first++
 	}
-	if first < len(lines) && isChapterHeadingLine(lines[first], title) {
+	// So khớp cả tên đầy đủ lẫn phần chữ thuần túy: đề mục do engine đóng mang số chương, còn model
+	// hay viết tên chương không số ("# Bát canh rong") — cả hai dạng đều phải bóc ra, không lặp lại.
+	if first < len(lines) && isChapterHeadingLine(lines[first], title, bareTitle) {
 		lines = lines[first+1:]
 	} else {
 		lines = lines[first:]
@@ -67,17 +110,19 @@ func ApplyChapterHeading(content, title string, chapter int) string {
 	for len(lines) > 0 && strings.TrimSpace(lines[0]) == "" {
 		lines = lines[1:]
 	}
-	return fmt.Sprintf("# %s\n\n%s", title, strings.Join(lines, "\n"))
+	return fmt.Sprintf("# %s\n\n%s", heading, strings.Join(lines, "\n"))
 }
 
-func isChapterHeadingLine(line, title string) bool {
+func isChapterHeadingLine(line string, titles ...string) bool {
 	bare := strings.TrimSpace(headingDecorRe.ReplaceAllString(strings.TrimSpace(line), ""))
 	if bare == "" {
 		return false
 	}
-	if strings.EqualFold(bare, title) {
-		return true
+	for _, t := range titles {
+		if t = strings.TrimSpace(t); t != "" && strings.EqualFold(bare, t) {
+			return true
+		}
 	}
-	// 章号开头且够短：是标题行，不是正文段落。
+	// Mở đầu bằng số chương và đủ ngắn: là dòng đề mục, không phải đoạn chính văn.
 	return chapterNumberRe.MatchString(bare) && len([]rune(bare)) <= 80
 }

@@ -8,16 +8,17 @@ import (
 	"sync"
 )
 
-// IO 封装文件系统读写操作，提供加锁和原子写入。
-// 每个子存储持有独立的 IO 实例，拥有各自的 sync.RWMutex。
+// IO đóng gói các thao tác đọc ghi hệ thống file, cung cấp khoá và ghi nguyên tử.
+// Mỗi kho con giữ một instance IO riêng, với sync.RWMutex riêng của mình.
 type IO struct {
 	dir  string
 	lang string
 	mu   sync.RWMutex
 }
 
-// SetLanguage 设定作品语种（"vi" / "zh"），影响派生 Markdown 视图的标签。
-// 启动时设一次；空值按上游默认走中文。
+// SetLanguage đặt ngôn ngữ tác phẩm ("vi" / "zh"), ảnh hưởng tới nhãn của các view
+// Markdown dẫn xuất. Đặt một lần lúc khởi động; giá trị rỗng thì theo mặc định tiếng
+// Trung của thượng nguồn.
 func (io *IO) SetLanguage(lang string) { io.lang = lang }
 
 func (io *IO) labels() mdLabels { return labelsFor(io.lang) }
@@ -104,11 +105,13 @@ func (io *IO) WriteMarkdown(rel string, content string) error {
 	return io.WriteFileUnlocked(rel, []byte(content))
 }
 
-// WriteMarkdownUnlocked 写出 .md sidecar。约定：每个 .md 都是对应 .json 的
-// best-effort 人类可读视图，绝非数据源——运行时与导出一律从 .json 重新渲染。
-// 各 Save 方法在同一写锁内先写 .json 再写此 .md，是两次独立的 tmp+rename；
-// 二者之间崩溃会留下 .md 落后于 .json，这是可接受的（无人把 .md 当数据读，
-// 下次写同一 scope 即自愈）。故意不为此加两文件原子提交——那是过度设计。
+// WriteMarkdownUnlocked ghi ra .md sidecar. Quy ước: mỗi .md đều là view dễ đọc cho
+// con người theo kiểu best-effort của .json tương ứng, tuyệt đối không phải nguồn dữ
+// liệu — runtime và export luôn render lại từ .json. Các phương thức Save trong cùng
+// một khoá ghi viết .json trước rồi mới viết .md này, là hai lần tmp+rename độc lập;
+// crash giữa hai bước sẽ để lại .md tụt hậu so với .json, điều này chấp nhận được
+// (không ai đọc .md như dữ liệu, lần viết cùng scope kế tiếp là tự chữa lành). Cố ý
+// không thêm commit nguyên tử hai file cho việc này — đó là thiết kế thừa.
 func (io *IO) WriteMarkdownUnlocked(rel string, content string) error {
 	return io.WriteFileUnlocked(rel, []byte(content))
 }
@@ -124,7 +127,9 @@ func (io *IO) AppendLineUnlocked(rel string, data []byte) error {
 	if err := os.MkdirAll(filepath.Dir(p), 0o755); err != nil {
 		return err
 	}
-	f, err := os.OpenFile(p, os.O_CREATE|os.O_WRONLY|os.O_APPEND, 0o644)
+	// 0o600: sessions/*.jsonl là bản ghi chép đầy đủ prompt/response, thuộc dữ liệu
+	// riêng tư (review F6).
+	f, err := os.OpenFile(p, os.O_CREATE|os.O_WRONLY|os.O_APPEND, 0o600)
 	if err != nil {
 		return err
 	}
@@ -135,8 +140,8 @@ func (io *IO) AppendLineUnlocked(rel string, data []byte) error {
 	return f.Sync()
 }
 
-// syncFileUnlocked 在幂等重放时确认已存在的追加记录已持久化。
-// 调用方负责持有 io.mu 写锁。
+// syncFileUnlocked xác nhận bản ghi thêm vào đã tồn tại được bền vững hoá khi replay
+// idempotent. Bên gọi chịu trách nhiệm giữ khoá ghi io.mu.
 func (io *IO) syncFileUnlocked(rel string) error {
 	f, err := os.OpenFile(io.path(rel), os.O_WRONLY, 0)
 	if err != nil {
@@ -169,7 +174,7 @@ func (io *IO) WithWriteLock(fn func() error) error {
 	return fn()
 }
 
-// EnsureDirs 创建指定的子目录。
+// EnsureDirs tạo các thư mục con được chỉ định.
 func (io *IO) EnsureDirs(dirs []string) error {
 	for _, d := range dirs {
 		if err := os.MkdirAll(filepath.Join(io.dir, d), 0o755); err != nil {

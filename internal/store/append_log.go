@@ -8,10 +8,13 @@ import (
 	"os"
 )
 
-// appendLog 管理只增长事实的 JSONL 存储。调用方负责持有 io.mu 写锁。
+// appendLog quản lý lưu trữ JSONL cho các dữ kiện chỉ tăng thêm (append-only).
+// Bên gọi chịu trách nhiệm giữ khoá ghi io.mu.
 //
-// 首次加载建立内存去重索引；正常追加只写新增记录。旧版 JSON 数组在第一次
-// 追加时一次性迁移，JSONL 成功落盘后再删除旧文件，因此任一中断窗口都可重放。
+// Lần tải đầu tiên dựng chỉ mục khử trùng trong bộ nhớ; khi thêm bản ghi (append)
+// bình thường chỉ ghi các bản ghi mới. Mảng JSON phiên bản cũ được migrate một lần
+// vào lần thêm đầu tiên, sau khi JSONL ghi xuống đĩa thành công mới xoá file cũ,
+// nên mọi cửa sổ gián đoạn đều có thể replay lại.
 type appendLog[T any] struct {
 	path       string
 	legacyPath string
@@ -76,8 +79,9 @@ func (l *appendLog[T]) allUnlocked(io *IO) ([]T, error) {
 	return l.cloneValues(l.values), nil
 }
 
-// appendUnlocked 返回实际新增的记录。即使旧文件清理失败，已经提交到 JSONL 的
-// 新记录也会返回，调用方可据此把派生投影标记为待修复；下一次重放只做清理。
+// appendUnlocked trả về các bản ghi thực sự được thêm mới. Ngay cả khi dọn dẹp file
+// cũ thất bại, các bản ghi mới đã commit vào JSONL vẫn được trả về; bên gọi có thể dựa
+// vào đó để đánh dấu projection dẫn xuất là cần sửa; lần replay kế tiếp chỉ việc dọn dẹp.
 func (l *appendLog[T]) appendUnlocked(io *IO, incoming []T) ([]T, error) {
 	if err := l.loadUnlocked(io); err != nil {
 		return nil, err
@@ -114,14 +118,15 @@ func (l *appendLog[T]) appendUnlocked(io *IO, incoming []T) ([]T, error) {
 			return nil, err
 		}
 		if err := io.AppendLineUnlocked(l.path, data); err != nil {
-			// 写入可能留下未换行的尾部。丢弃缓存，让下一次加载按提交协议
-			// 显式截断未提交尾部后再重放。
+			// Lần ghi có thể để lại đuôi thiếu ký tự xuống dòng. Huỷ bộ nhớ đệm, để lần tải
+			// kế tiếp theo giao thức commit cắt bỏ rõ ràng đuôi chưa commit rồi mới replay.
 			l.reset()
 			return nil, err
 		}
 	} else if len(incoming) > 0 && l.hasLog {
-		// 上一次追加可能已写完整记录，但 Sync 返回了错误。
-		// 幂等重放在确认成功前再次同步，不把“当前可读”误当成“已持久化”。
+		// Lần thêm trước có thể đã ghi xong bản ghi hoàn chỉnh nhưng Sync trả về lỗi.
+		// Replay idempotent đồng bộ lại lần nữa trước khi xác nhận thành công, không nhầm
+		// "đang đọc được hiện tại" thành "đã bền vững hoá".
 		if err := io.syncFileUnlocked(l.path); err != nil {
 			l.reset()
 			return nil, err
@@ -139,7 +144,7 @@ func (l *appendLog[T]) appendUnlocked(io *IO, incoming []T) ([]T, error) {
 			return l.cloneValues(added), err
 		}
 		l.legacyPresent = false
-		slog.Info("增长型事实已迁移为追加日志",
+		slog.Info("Dữ kiện chỉ-tăng đã được chuyển sang nhật ký append-only",
 			"module", "store", "from", l.legacyPath, "to", l.path, "records", len(l.values))
 	}
 	return l.cloneValues(added), nil
@@ -222,8 +227,9 @@ func decodeJSONLines[T any](path string, data []byte) ([]T, error) {
 	return values, nil
 }
 
-// committedJSONLinesUnlocked 丢弃协议上可证明未提交的尾部：只有以换行结束的
-// JSONL 记录才算提交。完整行损坏仍严格报错，不做猜测式修复。
+// committedJSONLinesUnlocked loại bỏ phần đuôi có thể chứng minh là chưa commit
+// theo giao thức: chỉ bản ghi JSONL kết thúc bằng ký tự xuống dòng mới được tính là
+// đã commit. Dòng hoàn chỉnh bị hỏng vẫn báo lỗi nghiêm ngặt, không tự sửa theo kiểu đoán mò.
 func committedJSONLinesUnlocked(io *IO, path string) ([]byte, error) {
 	data, err := io.ReadFileUnlocked(path)
 	if err != nil {
@@ -236,7 +242,7 @@ func committedJSONLinesUnlocked(io *IO, path string) ([]byte, error) {
 	if err := os.Truncate(io.path(path), int64(keep)); err != nil {
 		return nil, err
 	}
-	slog.Warn("已修复追加日志的未提交尾部",
+	slog.Warn("Đã sửa đuôi chưa commit của nhật ký append-only",
 		"module", "store", "file", path, "discarded_bytes", len(data)-keep)
 	return data[:keep], nil
 }

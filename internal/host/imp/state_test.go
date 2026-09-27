@@ -25,17 +25,17 @@ func TestNextActionChain(t *testing.T) {
 		f    Facts
 		want Action
 	}{
-		{"空", Facts{}, ActionIngest},
-		{"已建区待切分", Facts{WorkspaceReady: true}, ActionSegment},
-		{"已切分待确认", Facts{WorkspaceReady: true, Segmented: true}, ActionAwaitConfirmation},
-		{"已确认待分析", Facts{WorkspaceReady: true, Segmented: true, Confirmed: true, ExpectedChapters: 3}, ActionAnalyze},
-		{"分析未满", Facts{WorkspaceReady: true, Segmented: true, Confirmed: true, ExpectedChapters: 3, AnalyzedChapters: 2}, ActionAnalyze},
-		{"分析齐待综合", Facts{WorkspaceReady: true, Segmented: true, Confirmed: true, ExpectedChapters: 3, AnalyzedChapters: 3}, ActionSynthesize},
-		{"综合后 uncertain 待裁定", Facts{WorkspaceReady: true, Segmented: true, Confirmed: true, ExpectedChapters: 3, AnalyzedChapters: 3, Synthesized: true, StoryUncertain: true}, ActionAwaitStoryResolution},
-		{"uncertain 已裁定待发布", Facts{WorkspaceReady: true, Segmented: true, Confirmed: true, ExpectedChapters: 3, AnalyzedChapters: 3, Synthesized: true, StoryUncertain: true, StoryResolved: true}, ActionPublish},
-		{"明确状态待发布", Facts{WorkspaceReady: true, Segmented: true, Confirmed: true, ExpectedChapters: 3, AnalyzedChapters: 3, Synthesized: true}, ActionPublish},
-		{"全部一致", Facts{WorkspaceReady: true, Segmented: true, Confirmed: true, ExpectedChapters: 3, AnalyzedChapters: 3, Synthesized: true, Published: true}, ActionDone},
-		{"发布终态短路上游失鲜", Facts{Published: true}, ActionDone},
+		{"trống", Facts{}, ActionIngest},
+		{"đã dựng workspace chờ phân tách", Facts{WorkspaceReady: true}, ActionSegment},
+		{"đã phân tách chờ xác nhận", Facts{WorkspaceReady: true, Segmented: true}, ActionAwaitConfirmation},
+		{"đã xác nhận chờ phân tích", Facts{WorkspaceReady: true, Segmented: true, Confirmed: true, ExpectedChapters: 3}, ActionAnalyze},
+		{"phân tích chưa đủ", Facts{WorkspaceReady: true, Segmented: true, Confirmed: true, ExpectedChapters: 3, AnalyzedChapters: 2}, ActionAnalyze},
+		{"phân tích đủ chờ tổng hợp", Facts{WorkspaceReady: true, Segmented: true, Confirmed: true, ExpectedChapters: 3, AnalyzedChapters: 3}, ActionSynthesize},
+		{"sau tổng hợp uncertain chờ phán định", Facts{WorkspaceReady: true, Segmented: true, Confirmed: true, ExpectedChapters: 3, AnalyzedChapters: 3, Synthesized: true, StoryUncertain: true}, ActionAwaitStoryResolution},
+		{"uncertain đã phán định chờ công bố", Facts{WorkspaceReady: true, Segmented: true, Confirmed: true, ExpectedChapters: 3, AnalyzedChapters: 3, Synthesized: true, StoryUncertain: true, StoryResolved: true}, ActionPublish},
+		{"trạng thái rõ ràng chờ công bố", Facts{WorkspaceReady: true, Segmented: true, Confirmed: true, ExpectedChapters: 3, AnalyzedChapters: 3, Synthesized: true}, ActionPublish},
+		{"toàn bộ nhất quán", Facts{WorkspaceReady: true, Segmented: true, Confirmed: true, ExpectedChapters: 3, AnalyzedChapters: 3, Synthesized: true, Published: true}, ActionDone},
+		{"công bố trạng thái cuối nối tắt thượng nguồn hết tươi", Facts{Published: true}, ActionDone},
 	}
 	for _, c := range cases {
 		t.Run(c.name, func(t *testing.T) {
@@ -43,9 +43,9 @@ func TestNextActionChain(t *testing.T) {
 			if got != c.want {
 				t.Fatalf("NextAction=%s want=%s", got, c.want)
 			}
-			// 对同一事实快照恒定。
+			// Hằng số với cùng một snapshot sự thật.
 			if NextAction(c.f) != got {
-				t.Fatal("NextAction 对同一 Facts 不恒定")
+				t.Fatal("NextAction không hằng số với cùng một Facts")
 			}
 		})
 	}
@@ -53,12 +53,12 @@ func TestNextActionChain(t *testing.T) {
 
 func TestLoadStateReflectsWorkspace(t *testing.T) {
 	book := t.TempDir()
-	// 未建区：非活动 → ingest。
+	// Chưa dựng workspace: không hoạt động → ingest.
 	w := OpenWorkspace(book)
 	if NextAction(mustLoadState(t, w)) != ActionIngest {
-		t.Fatal("空书应先 ingest")
+		t.Fatal("sách trống phải ingest trước")
 	}
-	// 建区后：workspace ready、未切分 → segment。
+	// Sau khi dựng workspace: workspace ready, chưa phân tách → segment.
 	src := filepath.Join(book, "book.txt")
 	if err := os.WriteFile(src, []byte("第一章\n正文\n"), 0o644); err != nil {
 		t.Fatal(err)
@@ -69,10 +69,10 @@ func TestLoadStateReflectsWorkspace(t *testing.T) {
 	}
 	f := mustLoadState(t, ws)
 	if !f.WorkspaceReady || f.Segmented {
-		t.Fatalf("建区后事实不符：%+v", f)
+		t.Fatalf("sự thật sau khi dựng workspace không khớp: %+v", f)
 	}
 	if NextAction(f) != ActionSegment {
-		t.Fatal("建区后应 segment")
+		t.Fatal("sau khi dựng workspace phải segment")
 	}
 }
 
@@ -89,8 +89,8 @@ func TestLoadStateReportsCorruptArtifact(t *testing.T) {
 	if err := ws.writeAtomic(fileSegmentation, []byte("{")); err != nil {
 		t.Fatal(err)
 	}
-	if _, err := LoadState(ws); err == nil || !strings.Contains(err.Error(), "切分工件") {
-		t.Fatalf("损坏工件不得伪装成尚未切分: %v", err)
+	if _, err := LoadState(ws); err == nil || !strings.Contains(err.Error(), "artifact phân tách") {
+		t.Fatalf("artifact hỏng không được ngụy trang thành chưa phân tách: %v", err)
 	}
 }
 
@@ -106,23 +106,24 @@ func TestIngestSnapshotConsistent(t *testing.T) {
 		t.Fatalf("Ingest: %v", err)
 	}
 	if m.Encoding != encodingUTF8 || m.SourceName != "book.txt" {
-		t.Fatalf("manifest 不符：%+v", m)
+		t.Fatalf("manifest không khớp: %+v", m)
 	}
 	snap, err := ws.LoadSource()
 	if err != nil {
 		t.Fatal(err)
 	}
-	// 源快照必须已归一化，且摘要与 manifest 一致。
+	// Snapshot nguồn phải đã chuẩn hóa, và tóm tắt khớp manifest.
 	if string(snap) != "第一章\n正文一\n\n第二章\n正文二" {
-		t.Fatalf("源快照未归一化：%q", snap)
+		t.Fatalf("snapshot nguồn chưa chuẩn hóa: %q", snap)
 	}
 	if Digest(snap) != m.NormalizedSHA256 {
-		t.Fatal("源快照摘要与 manifest 不一致")
+		t.Fatal("tóm tắt snapshot nguồn không khớp manifest")
 	}
 }
 
-// TestGuidanceChangeInvalidatesSegmentation 守护 §18.3：切分指导是 segmentation 的语义输入，
-// 指导变化使旧切分（及其全部下游）自然失配重做，不需要手工失效规则。
+// TestGuidanceChangeInvalidatesSegmentation canh giữ §18.3: hướng dẫn phân tách là đầu vào ngữ
+// nghĩa của segmentation, hướng dẫn thay đổi làm phân tách cũ (và toàn bộ hạ nguồn) tự nhiên mất
+// khớp rồi làm lại, không cần quy tắc vô hiệu thủ công.
 func TestGuidanceChangeInvalidatesSegmentation(t *testing.T) {
 	book := t.TempDir()
 	src := filepath.Join(book, "book.txt")
@@ -142,18 +143,19 @@ func TestGuidanceChangeInvalidatesSegmentation(t *testing.T) {
 		t.Fatal(err)
 	}
 	if !mustLoadState(t, ws).Segmented {
-		t.Fatal("无指导时切分应有效")
+		t.Fatal("không có hướng dẫn thì phân tách phải hữu hiệu")
 	}
 	if err := ws.writeAtomic(fileGuidance, []byte("幕间也是独立章节")); err != nil {
 		t.Fatal(err)
 	}
 	if mustLoadState(t, ws).Segmented {
-		t.Fatal("指导变化后旧切分应失效（需重识别）")
+		t.Fatal("sau khi hướng dẫn đổi, phân tách cũ phải vô hiệu (cần nhận diện lại)")
 	}
 }
 
-// TestResumeSummary 守护 §18.2 启动提示：无工作区返回空串；停在半路时给出阶段化描述，
-// 使用户不必等到创作被门禁拒绝才发现这本书停在导入半路。
+// TestResumeSummary canh giữ nhắc khởi động §18.2: không có workspace trả chuỗi rỗng; kẹt nửa
+// đường thì đưa mô tả theo giai đoạn, để người dùng không phải đợi sáng tác bị cổng chặn từ chối
+// mới phát hiện cuốn sách kẹt nửa đường nhập.
 func TestResumeSummary(t *testing.T) {
 	dir := t.TempDir()
 	st := store.NewStore(dir)
@@ -161,7 +163,7 @@ func TestResumeSummary(t *testing.T) {
 		t.Fatal(err)
 	}
 	if got := ResumeSummary(st); got != "" {
-		t.Fatalf("无导入工作区应返回空串，得 %q", got)
+		t.Fatalf("không có workspace nhập phải trả chuỗi rỗng, được %q", got)
 	}
 	src := filepath.Join(dir, "book.txt")
 	if err := os.WriteFile(src, []byte("第一章\n正文\n"), 0o644); err != nil {
@@ -171,10 +173,10 @@ func TestResumeSummary(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Ingest: %v", err)
 	}
-	if got := ResumeSummary(st); !strings.Contains(got, "尚未完成切分") {
-		t.Fatalf("刚建区应提示未完成切分，得 %q", got)
+	if got := ResumeSummary(st); !strings.Contains(got, "chưa hoàn thành phân tách") {
+		t.Fatalf("vừa dựng workspace phải nhắc chưa hoàn thành phân tách, được %q", got)
 	}
-	// 切分+确认就绪、分析 0/1 → 提示分析进度。
+	// Phân tách + xác nhận sẵn sàng, phân tích 0/1 → nhắc tiến độ phân tích.
 	norm, _ := ws.LoadSource()
 	seg := Segmentation{Chapters: []ChapterSpan{{Number: 1, Title: "第一章", Start: 0, End: len(norm)}}}
 	if err := writeArtifact(ws, fileSegmentation, segmentInputDigest(Digest(norm), "", segmentPromptVersion), seg); err != nil {
@@ -184,14 +186,15 @@ func TestResumeSummary(t *testing.T) {
 	if err := writeArtifact(ws, fileConfirmation, Digest(raw), Confirmation{Method: confirmMethodAuto, Chapters: 1}); err != nil {
 		t.Fatal(err)
 	}
-	if got := ResumeSummary(st); !strings.Contains(got, "已分析 0/1 章") {
-		t.Fatalf("应提示分析进度，得 %q", got)
+	if got := ResumeSummary(st); !strings.Contains(got, "đã phân tích 0/1 chương") {
+		t.Fatalf("phải nhắc tiến độ phân tích, được %q", got)
 	}
 }
 
-// TestResumeStatusPublishedIsTerminal 守护发布终态（实测事故）：书已全量发布后，
-// segmentPromptVersion 升级使工作区切分工件失鲜，ResumeStatus 不得据此把书判回
-// "导入半路"——否则 startEngine 跨重启门禁会永久拒启已发布书的续写。
+// TestResumeStatusPublishedIsTerminal canh giữ trạng thái cuối công bố (sự cố thực đo): sách đã
+// công bố toàn lượng, nâng cấp segmentPromptVersion làm artifact phân tách của workspace hết tươi,
+// ResumeStatus không được dựa vào đó mà phán sách trở về "nửa đường nhập" — nếu không cổng chặn
+// cross-restart của startEngine sẽ từ chối vĩnh viễn việc viết tiếp cho sách đã công bố.
 func TestResumeStatusPublishedIsTerminal(t *testing.T) {
 	dir := t.TempDir()
 	st := store.NewStore(dir)
@@ -207,16 +210,16 @@ func TestResumeStatusPublishedIsTerminal(t *testing.T) {
 		t.Fatalf("Ingest: %v", err)
 	}
 	norm, _ := ws.LoadSource()
-	// 用旧版本号写切分：模拟发布后 prompt 升级导致的 digest 失配。
+	// Ghi phân tách bằng số phiên bản cũ: mô phỏng digest mất khớp do prompt nâng cấp sau công bố.
 	seg := Segmentation{Chapters: []ChapterSpan{{Number: 1, Title: "第一章", Start: 0, End: len(norm)}}}
 	if err := writeArtifact(ws, fileSegmentation, segmentInputDigest(Digest(norm), "", "seg-v0"), seg); err != nil {
 		t.Fatal(err)
 	}
-	// 未发布 + 切分失鲜：仍是半路导入，门禁应拦。
+	// Chưa công bố + phân tách hết tươi: vẫn là nhập nửa đường, cổng chặn phải chặn.
 	if active, done, err := ResumeStatus(st); err != nil || !active || done {
-		t.Fatalf("未发布的失鲜工作区应判未完成（active=%v done=%v）", active, done)
+		t.Fatalf("workspace hết tươi chưa công bố phải bị phán chưa hoàn thành (active=%v done=%v)", active, done)
 	}
-	// 正式库已按该切分全量落库 → 发布对账通过，终态不受上游失鲜影响。
+	// Kho chính thức đã ghi toàn lượng theo phân tách đó → đối soát công bố qua, trạng thái cuối không bị ảnh hưởng bởi thượng nguồn hết tươi.
 	if err := st.Book.Save(domain.BookMetadata{Title: "测试书", Synopsis: "测试简介"}); err != nil {
 		t.Fatal(err)
 	}
@@ -230,32 +233,32 @@ func TestResumeStatusPublishedIsTerminal(t *testing.T) {
 		t.Fatal(err)
 	}
 	if active, done, err := ResumeStatus(st); err != nil || !active || !done {
-		t.Fatalf("已发布书应判导入完成（active=%v done=%v）", active, done)
+		t.Fatalf("sách đã công bố phải bị phán nhập hoàn thành (active=%v done=%v)", active, done)
 	}
 	if got := ResumeSummary(st); got != "" {
-		t.Fatalf("已发布书不应提示未完成导入，得 %q", got)
+		t.Fatalf("sách đã công bố không nên nhắc lượt nhập chưa hoàn thành, được %q", got)
 	}
 }
 
 func TestImportPreconditions(t *testing.T) {
-	// 空书通过。
+	// Sách trống thì qua.
 	empty := store.NewStore(t.TempDir())
 	if err := checkImportPreconditions(empty); err != nil {
-		t.Fatalf("空书应通过前置校验：%v", err)
+		t.Fatalf("sách trống phải qua kiểm tra trước: %v", err)
 	}
-	// 有完成章节被拒。
+	// Có chương hoàn thành thì bị từ chối.
 	nonEmpty := store.NewStore(t.TempDir())
 	if err := nonEmpty.Progress.Save(&domain.Progress{CompletedChapters: []int{1, 2}}); err != nil {
 		t.Fatal(err)
 	}
 	if err := checkImportPreconditions(nonEmpty); err == nil {
-		t.Fatal("非空书应被拒绝导入")
+		t.Fatal("sách không trống phải bị từ chối nhập")
 	}
 	withBook := store.NewStore(t.TempDir())
 	if err := withBook.Book.Save(domain.BookMetadata{Title: "已有作品", Synopsis: "已有简介"}); err != nil {
 		t.Fatal(err)
 	}
 	if err := checkImportPreconditions(withBook); err == nil {
-		t.Fatal("已有作品信息时应被拒绝导入")
+		t.Fatal("đã có thông tin tác phẩm thì phải bị từ chối nhập")
 	}
 }

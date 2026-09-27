@@ -88,10 +88,31 @@ func TestBuildSnapshot_DegradedPropagates(t *testing.T) {
 
 func TestSystemDefaults_MatchesLegacyDefaultMD(t *testing.T) {
 	d := SystemDefaults().Structured
-	if len(d.ForbiddenPhrases) != 4 {
-		t.Fatalf("默认禁语应为 4 条，得到 %d", len(d.ForbiddenPhrases))
+	// 4 zh (legacy default.md) + 4 vi (sản phẩm mặc định language=vi).
+	if len(d.ForbiddenPhrases) != 8 {
+		t.Fatalf("số cụm cấm phải là 8 (4 zh + 4 vi), được %d", len(d.ForbiddenPhrases))
 	}
-	if len(d.FatigueWords) != 16 {
-		t.Fatalf("默认疲劳词应为 16 条，得到 %d", len(d.FatigueWords))
+	// 16 zh + 14 vi ("khẽ" nới ngưỡng cho văn dịch).
+	if len(d.FatigueWords) != 30 {
+		t.Fatalf("số từ mệt mỏi phải là 30 (16 zh + 14 vi), được %d", len(d.FatigueWords))
+	}
+}
+
+// SystemDefaults phải chứa cả bộ tiếng Việt (sản phẩm mặc định language=vi) —
+// chuỗi vi chỉ khớp văn Việt, chuỗi zh chỉ khớp văn Trung, cùng tồn tại an toàn.
+func TestSystemDefaultsIncludeVietnamese(t *testing.T) {
+	def := SystemDefaults()
+	found := false
+	for _, p := range def.Structured.ForbiddenPhrases {
+		if p == "theo một cách nào đó" {
+			found = true
+			break
+		}
+	}
+	if !found {
+		t.Fatalf("ForbiddenPhrases phải có mẫu tiếng Việt, got %v", def.Structured.ForbiddenPhrases)
+	}
+	if def.Structured.FatigueWords["khẽ"] < 1 {
+		t.Fatalf("FatigueWords phải có 'khẽ', got %v", def.Structured.FatigueWords)
 	}
 }

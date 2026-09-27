@@ -5,33 +5,33 @@ import (
 	"unicode/utf8"
 )
 
-// toolDisplays 配置每个工具在流面板上的展示策略。不在此表中的工具不参与流式
-// 渲染（observer 直接丢弃 DeltaToolCall）。
+// toolDisplays cấu hình chiến lược hiển thị của từng tool trên panel streaming. Tool không có trong bảng
+// này không tham gia render streaming (observer vứt DeltaToolCall trực tiếp).
 //
-// 通用模式（nakedKey 为空）：tokenizer 把 LLM 输出的 args JSON 渲染成缩进式
-// "key: value" 文本，嵌套对象/数组按层级缩进，string/number/bool 流式输出。
-// 与 schema 完全解耦——LLM 多输出一个字段就在面板上多一行，不需要任何代码改动。
+// Chế độ chung (nakedKey rỗng): tokenizer render args JSON mà LLM xuất thành dạng thụt lề
+// "key: value", object/array lồng nhau thụt lề theo cấp, string/number/bool xuất streaming.
+// Hoàn toàn tách rời schema — LLM thừa một trường thì panel thêm một dòng, không cần sửa mã.
 //
-// 裸流模式（nakedKey 非空）：仅把目标顶层字段的 string 值原样流出，其它字段
-// 全部跳过。给 draft_chapter 用，让整章 markdown 不被装饰成 "content: # …"。
-// header 一律以 "✻ " 开头：这是 TUI renderStreamContent 走 renderAgentBlock
-// 高亮路径（金 ✻ + 青底蓝下划线 label + dim 横线）的约定前缀，跟 fallback
-// header（streamHeaderFallback）保持一致；改成普通文字会落到正文路径用终端
-// 默认色画掉，title 不再醒目。
+// Chế độ dòng trần (nakedKey khác rỗng): chỉ đưa nguyên văn giá trị string của trường mục tiêu tầng trên cùng,
+// các trường khác bỏ hết. Dành cho draft_chapter, để markdown cả chương không bị trang điểm thành "content: # …".
+// header luôn bắt đầu bằng "✻ ": đây là tiền tố quy ước để TUI renderStreamContent đi đường
+// renderAgentBlock (✻ vàng + label nền xanh gạch chân xanh + đường kẻ dim), đồng bộ với fallback
+// header (streamHeaderFallback); đổi thành chữ thường sẽ rơi vào đường phần thân bị màu
+// mặc định terminal vẽ đè, title hết nổi bật.
 var toolDisplays = map[string]toolDisplay{
 	"draft_chapter": {nakedKey: "content"},
 
-	"plan_chapter":        {header: "✻ 规划"},
-	"edit_chapter":        {header: "✻ 打磨"},
-	"commit_chapter":      {header: "✻ 章节提交"},
-	"save_review":         {header: "✻ 审阅"},
-	"save_arc_summary":    {header: "✻ 弧摘要"},
-	"save_volume_summary": {header: "✻ 卷摘要"},
-	"save_foundation":     {header: "✻ 设定"},
-	"revise_outline":      {header: "✻ 修订大纲"},
-	"read_chapter":        {header: "✻ 读章节"},
-	"check_consistency":   {header: "✻ 一致性检查"},
-	"novel_context":       {header: "✻ 查询上下文"},
+	"plan_chapter":        {header: "✻ Lập dàn ý"},
+	"edit_chapter":        {header: "✻ Đánh bóng"},
+	"commit_chapter":      {header: "✻ Nộp chương"},
+	"save_review":         {header: "✻ Xem xét"},
+	"save_arc_summary":    {header: "✻ Tóm tắt cung"},
+	"save_volume_summary": {header: "✻ Tóm tắt quyển"},
+	"save_foundation":     {header: "✻ Thiết lập"},
+	"revise_outline":      {header: "✻ Sửa dàn ý"},
+	"read_chapter":        {header: "✻ Đọc chương"},
+	"check_consistency":   {header: "✻ Kiểm tra nhất quán"},
+	"novel_context":       {header: "✻ Tra ngữ cảnh"},
 }
 
 type toolDisplay struct {
@@ -39,20 +39,20 @@ type toolDisplay struct {
 	nakedKey string
 }
 
-// jsonFieldExtractor 是流式 JSON tokenizer。逐字节驱动状态机，把 LLM 的工具
-// args 流转成可读文本。同一实例只服务一次工具调用，顶层容器闭合后 Done()=true。
+// jsonFieldExtractor là tokenizer JSON streaming. Trạng thái máy chạy từng byte, biến args của
+// LLM thành văn bản dễ đọc. Một instance chỉ phục vụ một lần gọi tool, container tầng trên cùng đóng xong thì Done()=true.
 type jsonFieldExtractor struct {
 	cfg toolDisplay
 
 	state pState
-	stack []byte // 容器栈：'O' obj / 'A' arr
+	stack []byte // ngăn xếp container: 'O' obj / 'A' arr
 
 	keyBuf strings.Builder
 
 	escape bool
 	uHex   []byte
 
-	started bool // 是否已 emit 过任何字符（用于 header 与 第一个 key 之间的换行）
+	started bool // đã emit ký tự nào chưa (dùng cho xuống dòng giữa header và key đầu tiên)
 
 	done bool
 }
@@ -61,17 +61,17 @@ type pState int
 
 const (
 	psRoot         pState = iota
-	psBeforeKey           // obj 内：等待下一个 key 或 }
-	psInKey               // obj 内：解析 key
-	psAfterKey            // obj 内：等待 :
-	psBeforeValue         // 等待 value 起始字符
-	psStringStream        // string 值，流式 emit cooked 字符
-	psStringSkip          // string 值，跳过（裸流模式下非目标字段）
-	psNumberStream        // 数字，流式 emit
-	psNumberSkip          // 数字，跳过
-	psPrimStream          // true/false/null，流式 emit
-	psPrimSkip            // true/false/null，跳过
-	psDone                // 顶层容器已闭合
+	psBeforeKey           // trong obj: đợi key hoặc } kế tiếp
+	psInKey               // trong obj: parse key
+	psAfterKey            // trong obj: đợi :
+	psBeforeValue         // đợi ký tự bắt đầu value
+	psStringStream        // value string, emit streaming ký tự cooked
+	psStringSkip          // value string, bỏ qua (chế độ dòng trần với trường không phải mục tiêu)
+	psNumberStream        // số, emit streaming
+	psNumberSkip          // số, bỏ qua
+	psPrimStream          // true/false/null, emit streaming
+	psPrimSkip            // true/false/null, bỏ qua
+	psDone                // container tầng trên cùng đã đóng
 )
 
 func newToolExtractor(tool string) *jsonFieldExtractor {
@@ -98,7 +98,7 @@ func (e *jsonFieldExtractor) Feed(chunk string) string {
 	return out.String()
 }
 
-// ── 容器栈 / 缩进 ──
+// ── Ngăn xếp container / thụt lề ──
 
 func (e *jsonFieldExtractor) push(kind byte) {
 	e.stack = append(e.stack, kind)
@@ -118,7 +118,7 @@ func (e *jsonFieldExtractor) parent() byte {
 	return e.stack[len(e.stack)-1]
 }
 
-// writeIndent 写当前缩进。深度 = 嵌套层数 = len(stack)-1（root 容器内部不缩进）。
+// writeIndent ghi thụt lề hiện tại. Độ sâu = số cấp lồng = len(stack)-1 (bên trong container gốc không thụt lề).
 func (e *jsonFieldExtractor) writeIndent(out *strings.Builder) {
 	depth := len(e.stack) - 1
 	for range depth {
@@ -126,7 +126,7 @@ func (e *jsonFieldExtractor) writeIndent(out *strings.Builder) {
 	}
 }
 
-// ── 状态机 ──
+// ── Trạng thái máy ──
 
 func (e *jsonFieldExtractor) step(c byte, out *strings.Builder) {
 	switch e.state {
@@ -136,7 +136,7 @@ func (e *jsonFieldExtractor) step(c byte, out *strings.Builder) {
 			e.push('O')
 			e.state = psBeforeKey
 		case '[':
-			// 实际不会发生（tool args 总是 obj）；容忍：当 root arr
+			// Thực tế không xảy ra (tool args luôn là obj); bao dung: khi root là arr
 			e.push('A')
 			e.state = psBeforeValue
 		}
@@ -220,10 +220,10 @@ func (e *jsonFieldExtractor) step(c byte, out *strings.Builder) {
 	}
 }
 
-// ── 行渲染 ──
+// ── Render dòng ──
 
-// emitKeyLine 在 obj 内 key 解析完毕时调用，写出 "<lf><indent>key:" 前缀。
-// 裸流模式下不写 key 前缀（key 被记录在 keyBuf 中供 beginString 判断）。
+// emitKeyLine được gọi khi parse xong key trong obj, viết tiền tố "<lf><indent>key:".
+// Chế độ dòng trần không viết tiền tố key (key được ghi trong keyBuf để beginString xét).
 func (e *jsonFieldExtractor) emitKeyLine(out *strings.Builder, key string) {
 	if e.cfg.nakedKey != "" {
 		return
@@ -242,8 +242,8 @@ func (e *jsonFieldExtractor) emitKeyLine(out *strings.Builder, key string) {
 	out.WriteByte(':')
 }
 
-// emitArrayItem 在 arr 内每个元素起始时调用，写出 "<lf><indent>-"。primitive
-// 元素紧跟空格再 emit 值；struct 元素由后续嵌套自然换行处理。
+// emitArrayItem được gọi lúc bắt đầu mỗi phần tử trong arr, viết "<lf><indent>-". Phần tử
+// primitive nối khoảng trắng rồi emit giá trị; phần tử struct do phần lồng sau tự xuống dòng.
 func (e *jsonFieldExtractor) emitArrayItem(out *strings.Builder) {
 	if e.cfg.nakedKey != "" {
 		return
@@ -261,11 +261,11 @@ func (e *jsonFieldExtractor) emitArrayItem(out *strings.Builder) {
 	out.WriteByte('-')
 }
 
-// ── value 起始 ──
+// ── Bắt đầu value ──
 
 func (e *jsonFieldExtractor) beginString(out *strings.Builder) {
 	if e.cfg.nakedKey != "" {
-		// 裸流：仅顶层 obj 中目标 key 的 string 值才输出
+		// Dòng trần: chỉ giá trị string của key mục tiêu trong obj tầng trên cùng mới được xuất
 		if e.cfg.nakedKey == e.keyBuf.String() && len(e.stack) == 1 && e.stack[0] == 'O' {
 			e.state = psStringStream
 		} else {
@@ -275,7 +275,7 @@ func (e *jsonFieldExtractor) beginString(out *strings.Builder) {
 		e.uHex = nil
 		return
 	}
-	// 通用：obj 字段紧跟 "key: "（已 emit "key:"，再补空格）；arr 元素紧跟 "- "
+	// Chung: trường obj nối "key: " (đã emit "key:", giờ bù khoảng trắng); phần tử arr nối "- "
 	if e.parent() == 'A' {
 		e.emitArrayItem(out)
 		out.WriteByte(' ')
@@ -319,7 +319,7 @@ func (e *jsonFieldExtractor) beginPrim(first byte, out *strings.Builder) {
 
 func (e *jsonFieldExtractor) beginNested(kind byte, out *strings.Builder) {
 	if e.cfg.nakedKey != "" {
-		// 裸流模式不展开嵌套；用栈深度跟踪到匹配 } / ]
+		// Chế độ dòng trần không mở rộng phần lồng; dùng độ sâu ngăn xếp để theo dõi tới } / ] khớp
 		e.push(kind)
 		if kind == 'O' {
 			e.state = psBeforeKey
@@ -328,8 +328,8 @@ func (e *jsonFieldExtractor) beginNested(kind byte, out *strings.Builder) {
 		}
 		return
 	}
-	// 通用模式：arr 元素是嵌套结构时，先 emit 单独一行的 "<indent>-"
-	// （obj key 的 ":" 之后无空格，让嵌套的子 key 自然换行到下一行）
+	// Chế độ chung: khi phần tử arr là cấu trúc lồng, emit trước một dòng riêng "<indent>-"
+	// (sau ":" của key obj không có khoảng trắng, để key con lồng tự xuống dòng kế tiếp)
 	if e.parent() == 'A' {
 		e.emitArrayItem(out)
 	}
@@ -341,18 +341,18 @@ func (e *jsonFieldExtractor) beginNested(kind byte, out *strings.Builder) {
 	}
 }
 
-// closeContainer 处理 } 或 ]。
+// closeContainer xử lý } hoặc ].
 func (e *jsonFieldExtractor) closeContainer(out *strings.Builder) {
 	e.pop()
 	if len(e.stack) == 0 {
-		// 空 args（如 novel_context 不传参）兜底：emitKeyLine 没机会输出 header，
-		// 这里补一次，避免落到"既没标题也没内容"。
+		// args rỗng (như novel_context không truyền tham số) fallback: emitKeyLine không có cơ hội xuất header,
+		// bù một lần ở đây, tránh rơi vào "không tiêu đề cũng không nội dung".
 		if !e.started && e.cfg.nakedKey == "" && e.cfg.header != "" {
 			out.WriteString(e.cfg.header)
 			out.WriteByte('\n')
 			e.started = true
 		}
-		// 收尾换行让面板与下一段输出之间有清晰边界
+		// Xuống dòng kết thúc để panel có ranh giới rõ với đoạn xuất kế tiếp
 		if e.started {
 			out.WriteByte('\n')
 		}
@@ -367,7 +367,7 @@ func (e *jsonFieldExtractor) closeContainer(out *strings.Builder) {
 	}
 }
 
-// ── string 流式 ──
+// ── string streaming ──
 
 func (e *jsonFieldExtractor) handleStringByte(c byte, out *strings.Builder, skipping bool) {
 	if e.uHex != nil {
@@ -420,18 +420,18 @@ func writeEscapedByte(out *strings.Builder, c byte) {
 	case '/':
 		out.WriteByte('/')
 	case 'b', 'f':
-		// 退格 / 换页：忽略
+		// Backspace / form feed: bỏ qua
 	case 'u':
-		// 由调用方建立 uHex 缓冲；此处不输出
+		// Buffer uHex do bên gọi dựng; ở đây không xuất
 	default:
 		out.WriteByte('\\')
 		out.WriteByte(c)
 	}
 }
 
-// ── 收尾 ──
+// ── Kết thúc ──
 
-// afterValueDone string 闭合（读到结尾的 `"`）后转移到下一态。
+// afterValueDone chuyển sang trạng thái kế tiếp sau khi string đóng (đọc tới dấu `"` cuối).
 func (e *jsonFieldExtractor) afterValueDone() {
 	e.escape = false
 	e.uHex = nil
@@ -447,8 +447,8 @@ func (e *jsonFieldExtractor) afterValueDone() {
 	}
 }
 
-// afterValueChar number / primitive 的"结束字符"已被读到时按字符决定下一态。
-// 这个字符可能是 , / } / ] / 空白，由本函数转发分发。
+// afterValueChar quyết định trạng thái kế tiếp theo ký tự khi "ký tự kết thúc" của number / primitive
+// đã được đọc. Ký tự này có thể là , / } / ] / khoảng trắng, do hàm này chuyển tiếp phân phát.
 func (e *jsonFieldExtractor) afterValueChar(c byte, out *strings.Builder) {
 	switch c {
 	case '}', ']':
@@ -467,7 +467,7 @@ func (e *jsonFieldExtractor) afterValueChar(c byte, out *strings.Builder) {
 	}
 }
 
-// ── 工具 ──
+// ── Tiện ích ──
 
 func isNumberByte(c byte) bool {
 	switch c {

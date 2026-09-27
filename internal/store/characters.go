@@ -8,17 +8,17 @@ import (
 	"github.com/voocel/ainovel-cli/internal/domain"
 )
 
-// CharacterStore 管理角色档案和状态快照。
+// CharacterStore quản lý hồ sơ nhân vật và ảnh chụp trạng thái.
 type CharacterStore struct {
 	io      *IO
-	outline *OutlineStore // 只读依赖，用于快照遍历
+	outline *OutlineStore // phụ thuộc chỉ đọc, dùng cho việc duyệt khi lấy ảnh chụp
 }
 
 func NewCharacterStore(io *IO, outline *OutlineStore) *CharacterStore {
 	return &CharacterStore{io: io, outline: outline}
 }
 
-// Save 同时保存 characters.json 和 characters.md（原子写入）。
+// Save đồng thời lưu characters.json và characters.md (ghi nguyên tử).
 func (s *CharacterStore) Save(chars []domain.Character) error {
 	return s.io.WithWriteLock(func() error {
 		if err := s.io.WriteJSONUnlocked("characters.json", chars); err != nil {
@@ -28,7 +28,7 @@ func (s *CharacterStore) Save(chars []domain.Character) error {
 	})
 }
 
-// Load 从 characters.json 读取角色档案。
+// Load đọc hồ sơ nhân vật từ characters.json.
 func (s *CharacterStore) Load() ([]domain.Character, error) {
 	var chars []domain.Character
 	if err := s.io.ReadJSON("characters.json", &chars); err != nil {
@@ -40,12 +40,12 @@ func (s *CharacterStore) Load() ([]domain.Character, error) {
 	return chars, nil
 }
 
-// SaveSnapshots 保存角色状态快照到 meta/snapshots/v{vol}a{arc}.json。
+// SaveSnapshots lưu ảnh chụp trạng thái nhân vật vào meta/snapshots/v{vol}a{arc}.json.
 func (s *CharacterStore) SaveSnapshots(volume, arc int, snapshots []domain.CharacterSnapshot) error {
 	return s.io.WriteJSON(fmt.Sprintf("meta/snapshots/v%02da%02d.json", volume, arc), snapshots)
 }
 
-// LoadSnapshots 读取指定卷弧的角色快照。
+// LoadSnapshots đọc ảnh chụp nhân vật của cặp tập-cung chỉ định.
 func (s *CharacterStore) LoadSnapshots(volume, arc int) ([]domain.CharacterSnapshot, error) {
 	var snapshots []domain.CharacterSnapshot
 	if err := s.io.ReadJSON(fmt.Sprintf("meta/snapshots/v%02da%02d.json", volume, arc), &snapshots); err != nil {
@@ -57,10 +57,11 @@ func (s *CharacterStore) LoadSnapshots(volume, arc int) ([]domain.CharacterSnaps
 	return snapshots, nil
 }
 
-// LoadLatestSnapshots 加载最近一次角色快照（按卷弧倒序查找）。
+// LoadLatestSnapshots tải ảnh chụp nhân vật gần đây nhất (tìm theo thứ tự tập-cung giảm dần).
 func (s *CharacterStore) LoadLatestSnapshots() ([]domain.CharacterSnapshot, error) {
-	// 大纲缺失→(nil,nil) 已在 LoadLayeredOutline 内消化;损坏必须上抛，否则角色快照
-	// 会随分层大纲损坏一起静默消失，写作丢失角色连续性却无人知晓。
+	// Dàn ý thiếu → (nil,nil) đã được xử lý bên trong LoadLayeredOutline; file hỏng thì
+	// phải ném lỗi lên, nếu không ảnh chụp nhân vật sẽ âm thầm biến mất cùng lúc dàn ý
+	// phân tầng hỏng, quá trình viết mất tính liên tục nhân vật mà không ai hay biết.
 	volumes, err := s.outline.LoadLayeredOutline()
 	if err != nil {
 		return nil, err

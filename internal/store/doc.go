@@ -1,23 +1,25 @@
-// Package store 提供基于文件系统的持久化存储。
+// Package store cung cấp tầng lưu trữ bền vững dựa trên hệ thống file.
 //
-// 架构：1 个 IO 基座 + 多个子存储 + 1 个组合根。
-// 每个子存储持有独立的 IO 实例和独立的 sync.RWMutex。
-// 主要领域（Progress、Outline、Drafts、Summaries 等）的读写互不阻塞；
-// WorldStore 将多个低频小领域合并共享一把锁。
+// Kiến trúc: 1 nền IO + nhiều kho con + 1 gốc tổ hợp.
+// Mỗi kho con giữ một instance IO riêng và một sync.RWMutex riêng.
+// Các lĩnh vực chính (Progress, Outline, Drafts, Summaries...) đọc ghi không chặn lẫn
+// nhau; WorldStore gộp nhiều lĩnh vực nhỏ tần suất thấp để dùng chung một khoá.
 //
-// 组合根 Store 持有所有子存储的引用，并串行协调跨域操作
-// （ExpandArc、AppendVolume、ClearHandledSteer）；多个文件不构成事务原子提交，
-// 调用依靠安全写入顺序、显式错误与同参数幂等重放恢复。
+// Gốc tổ hợp Store giữ tham chiếu tới mọi kho con, và điều phối tuần tự các thao tác
+// xuyên lĩnh vực (ExpandArc, AppendVolume, ClearHandledSteer); nhiều file không tạo
+// thành giao dịch commit nguyên tử, bên gọi dựa vào thứ tự ghi an toàn, lỗi tường minh
+// và replay idempotent cùng tham số để phục hồi.
 //
-// 子存储划分：
-//   - ProgressStore: 进度主状态（meta/progress.json）
-//   - OutlineStore: 前提、大纲（扁平/分层）、指南针
-//   - DraftStore: 章节构思、草稿、终稿
-//   - SummaryStore: 章/弧/卷摘要
-//   - RunMetaStore: 运行元数据（模型、干预历史）
-//   - SignalStore: 一次性信号文件（PendingCommit 恢复）
-//   - CheckpointStore: step 级 checkpoint（meta/checkpoints.jsonl）
-//   - RuntimeStore: 运行时事件队列（meta/runtime/*.jsonl）
-//   - CharacterStore: 角色档案、状态快照
-//   - WorldStore: 时间线、伏笔、关系、状态变化、世界规则、风格规则、审阅
+// Phân chia kho con:
+//   - ProgressStore: trạng thái chính của tiến độ (meta/progress.json)
+//   - OutlineStore: tiền đề, dàn ý (phẳng/phân tầng), la bàn
+//   - DraftStore: ý tưởng chương, bản nháp, chính văn bản cuối
+//   - SummaryStore: tóm tắt chương/cung/tập
+//   - RunMetaStore: siêu dữ liệu vận hành (model, lịch sử can thiệp)
+//   - SignalStore: file tín hiệu dùng một lần (khôi phục PendingCommit)
+//   - CheckpointStore: checkpoint cấp step (meta/checkpoints.jsonl)
+//   - RuntimeStore: hàng đợi sự kiện runtime (meta/runtime/*.jsonl)
+//   - CharacterStore: hồ sơ nhân vật, ảnh chụp trạng thái
+//   - WorldStore: dòng thời gian, phục bút, quan hệ, thay đổi trạng thái, quy tắc thế
+//     giới, quy tắc phong cách, xem xét
 package store

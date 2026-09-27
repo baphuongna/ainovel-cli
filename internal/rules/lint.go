@@ -7,13 +7,14 @@ import (
 	"unicode/utf8"
 )
 
-// Lint 内置产品底线检查：扫描正文中的机制残留，与用户规则无关，commit 时始终执行。
-// 与 Check 同契约——仅返事实（铁律一），不阻断流程，由评审/用户裁定。
+// Lint là kiểm tra đường đáy dựng sẵn của sản phẩm: quét dấu vết cơ chế còn sót trong chính văn,
+// không liên quan quy tắc người dùng, luôn chạy lúc commit. Cùng hợp đồng với Check — chỉ trả
+// sự thực (luật sắt một), không chặn quy trình, do việc xem xét/người dùng phán định.
 //
-// 当前三类（全部来自真实长跑产物的实证缺陷）：
-//   - markdown_residue：正文残留 ** 加粗、首行之外的 # 标题行（导出 txt 会裸露符号）
-//   - non_cjk_fragments / cjk_leak：文字混杂片段，方向按正文主文字自动判定
-//     （中文正文报拉丁片段；越南语等拉丁文字正文报汉字片段）
+// Hiện ba loại (đều từ khuyết điểm thực chứng của sản phẩm chạy dài thật):
+//   - markdown_residue: chính văn còn sót ** đậm, dòng tiêu đề # ngoài dòng đầu (xuất txt sẽ lộ ký tự trần)
+//   - non_cjk_fragments / cjk_leak: đoạn văn trộn lẫn chữ, hướng tự phán định theo chữ chính của chính văn
+//     (chính văn tiếng Trung thì báo đoạn Latin; chính văn chữ Latin như tiếng Việt thì báo đoạn chữ Hán)
 func Lint(text string) []Violation {
 	var vs []Violation
 	vs = appendMarkdownResidue(vs, text)
@@ -40,7 +41,7 @@ func appendMarkdownResidue(vs []Violation, text string) []Violation {
 		if t == "" {
 			continue
 		}
-		// 第一个非空行的 # 标题是章文件的合法格式（不按行号写死，容忍前导空行）
+		// Tiêu đề # của dòng khác rỗng đầu tiên là định dạng hợp pháp của file chương (không đóng cứng theo số dòng, chấp nhận dòng trống dẫn đầu)
 		first := !seenContent
 		seenContent = true
 		if !first && strings.HasPrefix(t, "#") {
@@ -60,30 +61,32 @@ func appendMarkdownResidue(vs []Violation, text string) []Violation {
 
 var (
 	latinFragmentRe = regexp.MustCompile(`[A-Za-z]{2,}`)
-	// 含 CJK 标点：漏进越南语正文的不只是汉字，还有「。，、？！」这类全角标点。
-	// 实测第 4 章正文里一个孤立的「。」——纯汉字规则完全看不见。
+	// Gồm cả dấu câu CJK: thứ lọt vào chính văn tiếng Việt không chỉ là chữ Hán, mà cả dấu
+	// toàn rộng kiểu "。，、？！". Thực đo chương 4 có một "。" cô lập — quy tắc chỉ chữ Hán thuần hoàn toàn không nhìn thấy.
 	cjkFragmentRe = regexp.MustCompile(`[\p{Han}\x{3000}-\x{303f}\x{ff01}-\x{ff5e}]+`)
 )
 
-// appendScriptMixing 报告正文里「另一种文字」的混入片段。
+// appendScriptMixing báo cáo đoạn "chữ khác loại" lẫn vào chính văn.
 //
-// 哪种文字算混入由正文自身决定，不读配置：中文正文里裸混 "pattern" 是缺陷，
-// 而越南语正文每个词都是拉丁字母，按同一条规则会在每章误报上千次，把评审
-// 上下文淹掉——实测一章命中 1021 次而全章并无一个汉字。反过来，越南语正文
-// 里漏出「根系之力」才是真缺陷，旧规则完全看不见。
+// Chữ nào tính là lẫn vào do chính văn tự quyết định, không đọc cấu hình: chính văn tiếng
+// Trung lẫn trần "pattern" là khuyết điểm, còn chính văn tiếng Việt từ nào cũng là chữ Latin,
+// theo cùng một quy tắc sẽ báo nhầm hàng nghìn lần mỗi chương, nhấn chìm ngữ cảnh xem xét —
+// thực đo một chương trúng 1021 lần mà toàn chương không có một chữ Hán nào. Ngược lại, chính
+// văn tiếng Việt lộ ra "根系之力" mới là khuyết điểm thật, quy tắc cũ hoàn toàn không nhìn thấy.
 //
-// 因此先按字符占比判定正文主文字，再只报少数派。两种题材各自成立，且配置
-// 写错也不会失效。合法外来词（品牌名/缩写）仍会命中——warning 级事实，由评审裁定。
+// Vì vậy trước tiên phán định chữ chính của chính văn theo tỷ trọng ký tự, rồi chỉ báo phe
+// thiểu số. Hai loại đề tài đều đứng vững, và cấu hình viết sai cũng không mất hiệu lực. Từ
+// mượn hợp pháp (tên thương hiệu/viết tắt) vẫn sẽ trúng — sự thực cấp warning, do việc xem xét phán định.
 func appendScriptMixing(vs []Violation, text string) []Violation {
 	latin := latinFragmentRe.FindAllString(text, -1)
 	han := cjkFragmentRe.FindAllString(text, -1)
 
-	// 比的是「汉字个数」与「拉丁词个数」，不是两边的字符数：一个汉字约等于一个词，
-	// 而一个拉丁词有好几个字母。按字符数比，中文正文里混几个 "pattern"/"DNA"
-	// 就会把拉丁字符数顶过汉字数，从而误判正文语种。
+	// So sánh là "số chữ Hán" với "số từ Latin", không phải số ký tự hai bên: một chữ Hán xấp xỉ
+	// một từ, còn một từ Latin có vài chữ cái. So theo số ký tự, chính văn tiếng Trung lẫn vài
+	// "pattern"/"DNA" sẽ đẩy số ký tự Latin vượt số chữ Hán, dẫn tới phán đoán sai ngôn ngữ chính văn.
 	rule, matches := "non_cjk_fragments", latin
 	if runeCount(han) <= len(latin) {
-		// 正文是拉丁文字（越南语等）：汉字才是混入。
+		// Chính văn là chữ Latin (tiếng Việt v.v.): chữ Hán mới là thứ lẫn vào.
 		rule, matches = "cjk_leak", han
 	}
 	if len(matches) == 0 {
@@ -117,9 +120,10 @@ func runeCount(ss []string) int {
 	return n
 }
 
-// brokenWordRe 匹配被段落分隔切断的单词：一行以字母结尾，跨过空行后又以小写字母开头。
-// 越南语正文实测：「n Tông, Ng」+ 空行 +「ọc Lâm dừng bước」——人名 Ngọc 被劈成两半。
-// 拉丁文字里一个词不会跨段落，因此这个形状没有正当写法，可直接判为缺陷。
+// brokenWordRe khớp từ bị cắt đôi bởi phân cách đoạn: một dòng kết thúc bằng chữ cái, vượt qua
+// dòng trống rồi lại bắt đầu bằng chữ thường. Thực đo chính văn tiếng Việt: "n Tông, Ng" +
+// dòng trống + "ọc Lâm dừng bước" — tên riêng Ngọc bị bổ làm hai nửa. Trong chữ Latin một từ
+// không thể vắt qua đoạn, vì vậy hình thù này không có cách viết chính đáng, có thể phán là khuyết điểm luôn.
 var brokenWordRe = regexp.MustCompile(`(?m)[\p{L}]\n\s*\n[[:space:]]*[\p{Ll}]`)
 
 func appendBrokenWords(vs []Violation, text string) []Violation {
@@ -135,11 +139,11 @@ func appendBrokenWords(vs []Violation, text string) []Violation {
 	})
 }
 
-// paraMinRunes 是参与重复比对的段落下限。短段落天然会重复（"Hắn gật đầu."、
-// 一声"Bắt đầu!"），只有成段的文字逐字重现才是生成事故。
+// paraMinRunes là giới hạn dưới của đoạn văn tham gia so sánh lặp. Đoạn ngắn vốn dễ trùng
+// ("Hắn gật đầu.", một tiếng "Bắt đầu!"), chỉ có văn thành đoạn tái hiện nguyên văn mới là sự cố sinh nội dung.
 const paraMinRunes = 20
 
-// paragraphs 切出够长、值得比对的正文段落，跳过标题行。
+// paragraphs cắt ra các đoạn chính văn đủ dài, đáng so sánh, bỏ qua dòng tiêu đề.
 func paragraphs(text string) []string {
 	var out []string
 	for _, p := range strings.Split(text, "\n\n") {
@@ -154,12 +158,12 @@ func paragraphs(text string) []string {
 	return out
 }
 
-// selfDupThreshold / crossDupThreshold 是重复字符占本章的比例上限。
+// selfDupThreshold / crossDupThreshold là giới hạn trên tỷ lệ ký tự lặp trên chương này.
 //
-// 阈值来自实测：一本 22 章的书里 19 章两项都是 0.0%，出事的三章分别是
-// 自重复 43.5%（第21章，同一段落出现 5 次）、跨章 32.2%（第14章照抄第13章）
-// 与 12.9%（第22章照抄第21章）。信号是二元的，中间没有灰区，因此取 10%
-// 给"刻意重复的副歌/咒诀"留足余地。
+// Ngưỡng từ thực đo: trong một cuốn 22 chương, 19 chương cả hai mục đều 0.0%, ba chương xảy
+// ra sự cố lần lượt là tự lặp 43.5% (chương 21, cùng một đoạn xuất hiện 5 lần), xuyên chương
+// 32.2% (chương 14 chép chương 13) và 12.9% (chương 22 chép chương 21). Tín hiệu là nhị phân,
+// ở giữa không có vùng xám, nên lấy 10% chừa đủ dư địa cho "điệp khúc/chú ngục cố ý lặp lại".
 const (
 	selfDupThreshold  = 0.10
 	crossDupThreshold = 0.10
@@ -197,13 +201,14 @@ func appendSelfDuplication(vs []Violation, text string) []Violation {
 	})
 }
 
-// CheckAgainstPrevious 检出"新章其实是上一章的副本"。
+// CheckAgainstPrevious phát hiện "chương mới thực ra là bản sao của chương trước".
 //
-// Writer 有 read_chapter，会先看上一章写了什么，然后把它抄下来当续写——实测
-// 第14章 32.2% 的字符逐字来自第13章，第22章 12.9% 来自第21章。
+// Writer có read_chapter, sẽ xem chương trước viết gì rồi chép lại coi như tiếp viết — thực
+// đo chương 14 có 32.2% ký tự lấy nguyên văn từ chương 13, chương 22 có 12.9% từ chương 21.
 //
-// self_duplication 看不见这类事故：它只在单章范围内统计，而照抄的那一章内部
-// 完全干净。因此必须单独按"上文"比对。previous 为空则跳过。
+// self_duplication không nhìn thấy sự cố loại này: nó chỉ thống kê trong phạm vi một chương,
+// mà chương chép đó bên trong hoàn toàn sạch. Vì vậy phải so riêng theo "văn bản trước".
+// previous rỗng thì bỏ qua.
 func CheckAgainstPrevious(text string, previous []string) []Violation {
 	cur := paragraphs(text)
 	if len(cur) == 0 || len(previous) == 0 {
@@ -263,26 +268,30 @@ func truncateRunes(s string, n int) string {
 	return string(r[:n]) + "…"
 }
 
-// englishFunctionWordRe 只收英语虚词——它们绝不会作为借词进入越南语正文。
-// 内容词（flow / lesson / footsteps 之类）故意不收：现代题材里可能是合理外来语，
-// 而"the flow"这类短语已被其中的 the 命中，不必冒误报的风险。
+// englishFunctionWordRe chỉ thu hư từ tiếng Anh — chúng tuyệt đối không thể vào chính văn
+// tiếng Việt như từ mượn. Từ nội dung (flow / lesson / footsteps v.v.) cố ý không thu: trong
+// đề tài hiện đại có thể là ngoại ngữ hợp lý, mà cụm kiểu "the flow" đã bị the trong nó bắt,
+// không cần mạo hiểm báo nhầm.
 var englishFunctionWordRe = regexp.MustCompile(
 	`(?i)\b(not|the|and|but|for|from|with|they|this|that|just|one|was|were|have|when|which|while|into|over)\b`)
 
-// vietnameseMarkRe 匹配越南语专有字母：7 个基字母（ăâđêôơư，含大写）加上
-// Latin Extended Additional 区 U+1EA0-U+1EF9——该区几乎专供越南语声调字母。
-// 只列少数预组合字符是不够的：一句普通越南语里大半声调字母都落在那个区间内。
+// vietnameseMarkRe khớp chữ riêng của tiếng Việt: 7 chữ cơ sở (ăâđêôơư, kể cả in hoa) cộng
+// vùng Latin Extended Additional U+1EA0-U+1EF9 — vùng này gần như chuyên cho chữ mang dấu
+// thanh tiếng Việt. Chỉ liệt kê vài ký tự tổ hợp sẵn là chưa đủ: trong một câu tiếng Việt
+// thường, hơn nửa chữ mang dấu đều nằm trong vùng đó.
 var vietnameseMarkRe = regexp.MustCompile(`[ăâđêôơưĂÂĐÊÔƠƯ\x{1ea0}-\x{1ef9}]`)
 
-// vietnameseMarkFloor 是判定"正文为越南语"所需的专有字母数。真实一章有成百上千个；
-// 设下限只为在英文/中文作品里让本规则彻底静音。
+// vietnameseMarkFloor là số chữ riêng cần có để phán định "chính văn là tiếng Việt".
+// Một chương thật có hàng trăm hàng nghìn; đặt giới hạn dưới chỉ để quy tắc này im hẳn
+// trong tác phẩm tiếng Anh/tiếng Trung.
 const vietnameseMarkFloor = 12
 
-// appendEnglishResidue 报告越南语正文里夹带的英语虚词。
+// appendEnglishResidue báo cáo hư từ tiếng Anh xen vào chính văn tiếng Việt.
 //
-// cjk_leak 对此完全无能：越南语与英语同属拉丁字母，混进来的 "not"/"the" 与正文
-// 在字符层面无从区分。而这不是小事——实测第18章出现 27 次 not、9 次 the、3 次 from，
-// 例如「Lá cây bắt đầu chuyển động—not nhanh chóng mà nhẹ nhàng」。
+// cjk_leak hoàn toàn bất lực với việc này: tiếng Việt và tiếng Việt cùng thuộc chữ Latin,
+// "not"/"the" lẫn vào không thể phân biệt với chính văn ở tầng ký tự. Mà đây không phải chuyện
+// nhỏ — thực đo chương 18 xuất hiện 27 lần not, 9 lần the, 3 lần from, ví dụ
+// "Lá cây bắt đầu chuyển động—not nhanh chóng mà nhẹ nhàng".
 func appendEnglishResidue(vs []Violation, text string) []Violation {
 	if len(vietnameseMarkRe.FindAllString(text, vietnameseMarkFloor)) < vietnameseMarkFloor {
 		return vs

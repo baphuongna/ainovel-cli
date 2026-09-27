@@ -79,19 +79,19 @@ func TestStartupFailureStaysInWorkbench(t *testing.T) {
 	next, _ := m.handleStartResultMsg(startResultMsg{err: errors.New("模型账户未激活")})
 	got := next.(Model)
 	if got.mode != modeRunning {
-		t.Fatalf("启动失败后 mode = %v, want modeRunning", got.mode)
+		t.Fatalf("sau khi khởi động thất bại mode = %v, muốn modeRunning", got.mode)
 	}
 	if got.starting {
-		t.Fatal("启动失败后 starting 应复位")
+		t.Fatal("sau khi khởi động thất bại starting phải được đặt lại")
 	}
 	if got.snapshot.IsRunning {
-		t.Fatal("启动失败后 snapshot 不应仍显示运行中")
+		t.Fatal("sau khi khởi động thất bại snapshot không được vẫn hiển thị đang chạy")
 	}
 	if !strings.Contains(got.textarea.Placeholder, "gián đoạn") && !strings.Contains(got.textarea.Placeholder, "thất bại") {
 		t.Fatalf("placeholder = %q", got.textarea.Placeholder)
 	}
 	if len(got.events) == 0 || got.events[len(got.events)-1].Category != "ERROR" {
-		t.Fatalf("工作台应保留启动错误事件: %+v", got.events)
+		t.Fatalf("bàn làm việc phải giữ lại sự kiện lỗi khởi động: %+v", got.events)
 	}
 }
 
@@ -108,7 +108,7 @@ func TestApplyStartupPromptEventTruncatesSummaryButKeepsDetail(t *testing.T) {
 	if ev.Detail != prompt {
 		t.Fatalf("detail should keep full prompt, got len=%d want=%d", len([]rune(ev.Detail)), len([]rune(prompt)))
 	}
-	maxSummaryRunes := len([]rune("创作需求: ")) + maxPromptEventCols
+	maxSummaryRunes := len([]rune("Yêu cầu sáng tác: ")) + maxPromptEventCols
 	if got := len([]rune(ev.Summary)); got > maxSummaryRunes {
 		t.Fatalf("summary runes = %d, want <= %d", got, maxSummaryRunes)
 	}
@@ -121,15 +121,15 @@ func TestStreamFlushTimerRunsOnlyForPendingData(t *testing.T) {
 	m := NewModel(nil, "")
 	next, cmd, handled := m.handleRuntimeMsg(streamDeltaMsg("正文"))
 	if !handled || cmd == nil {
-		t.Fatal("流式增量应启动一次刷新")
+		t.Fatal("delta stream phải khởi động một lần refresh")
 	}
 	got := next.(Model)
 	if !got.streamDirty || !got.flushPending {
-		t.Fatal("流式增量应标记待刷新")
+		t.Fatal("delta stream phải đánh dấu chờ refresh")
 	}
 	next, cmd, handled = got.handleRuntimeMsg(streamFlushTickMsg{})
 	got = next.(Model)
 	if !handled || cmd != nil || got.streamDirty || got.flushPending {
-		t.Fatal("刷新完成后 timer 应停止")
+		t.Fatal("sau khi refresh xong timer phải dừng")
 	}
 }

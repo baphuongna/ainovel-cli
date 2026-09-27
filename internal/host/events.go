@@ -4,32 +4,32 @@ import (
 	"time"
 )
 
-// Event 是 TUI 消费的结构化事件。
+// Event là sự kiện có cấu trúc do TUI tiêu thụ.
 //
-// 对于 TOOL / DISPATCH / DECISION 三类调用事件，同一次调用的开始与结束共用一个 ID：
-// 开始时先发 FinishedAt 为零值的事件（TUI 渲染为"进行中"样式）；
-// 结束时再发一条同 ID 的事件，填入 FinishedAt + Duration（+ Failed），
-// TUI 按 ID 定位原行原地更新，避免"开始一行、完成又一行"的冗余。
+// Với ba loại sự kiện gọi TOOL / DISPATCH / DECISION, lần bắt đầu và kết thúc của cùng một lần gọi dùng chung một ID:
+// lúc bắt đầu phát sự kiện có FinishedAt bằng giá trị zero (TUI render theo kiểu "đang thực hiện");
+// lúc kết thúc phát một sự kiện cùng ID, điền FinishedAt + Duration (+ Failed),
+// TUI định vị dòng gốc theo ID và cập nhật tại chỗ, tránh thừa "một dòng bắt đầu, xong lại một dòng".
 //
-// SYSTEM / ERROR / CONTEXT 等非调用类事件 ID 为空，每条独立追加。
+// Sự kiện không thuộc loại gọi như SYSTEM / ERROR / CONTEXT có ID rỗng, mỗi dòng được append độc lập.
 type Event struct {
-	ID         string    // 同一次调用的开始/结束共用；非调用事件为空
-	Time       time.Time // 首次发出时间（开始时刻）
-	FinishedAt time.Time // 零值 = 进行中；非零 = 已完成
-	Failed     bool      // 已完成但失败（仅完成态有意义）
+	ID         string    // bắt đầu/kết thúc của cùng một lần gọi dùng chung; sự kiện không phải kiểu gọi thì rỗng
+	Time       time.Time // thời điểm phát lần đầu (thời khắc bắt đầu)
+	FinishedAt time.Time // giá trị zero = đang thực hiện; khác zero = đã hoàn thành
+	Failed     bool      // đã hoàn thành nhưng thất bại (chỉ có nghĩa ở trạng thái hoàn thành)
 	Category   string    // DISPATCH / TOOL / DECISION / SYSTEM / REVIEW / CHECK / ERROR / CONTEXT
-	Agent      string    // 产生事件的 agent
+	Agent      string    // agent phát sinh sự kiện
 	Summary    string
-	Detail     string        // 完整文案，写入日志不截断供排查；为空回退 Summary。UI 只读 Summary
-	Kind       string        // 错误分类（如 stream_idle），随日志输出供过滤/告警；为空不输出
+	Detail     string        // văn bản đầy đủ, ghi vào log không cắt ngắn để điều tra; rỗng thì lùi về Summary. UI chỉ đọc Summary
+	Kind       string        // phân loại lỗi (như stream_idle), xuất theo log để lọc/cảnh báo; rỗng thì không xuất
 	Level      string        // info / warn / error / success
-	Depth      int           // 0 = Engine 层, 1 = Worker 层
-	Duration   time.Duration // 完成时的执行耗时
-	RetryAt    time.Time     // 重试类事件：下次重试的截止时刻；UI 据此逐秒倒计时，到点即清（请求已在途）
+	Depth      int           // 0 = tầng Engine, 1 = tầng Worker
+	Duration   time.Duration // thời gian thực thi khi hoàn thành
+	RetryAt    time.Time     // sự kiện kiểu thử lại: thời điểm hết hạn của lần thử kế tiếp; UI dựa đó đếm ngược từng giây, tới điểm thì dọn (yêu cầu đang in-flight)
 }
 
-// Running 返回事件是否处于进行中。
-// 仅调用类事件（有 ID 的 TOOL / DISPATCH / DECISION）可能进行中；其它类型总是返回 false。
+// Running trả về sự kiện có đang thực hiện hay không.
+// Chỉ sự kiện kiểu gọi (TOOL / DISPATCH / DECISION có ID) mới có thể đang thực hiện; các loại khác luôn trả false.
 func (e Event) Running() bool {
 	return e.hasLifecycle() && e.FinishedAt.IsZero()
 }
@@ -46,12 +46,12 @@ func (e Event) hasLifecycle() bool {
 	}
 }
 
-// UISnapshot 是 TUI 渲染所需的聚合状态快照。
+// UISnapshot là snapshot tổng hợp trạng thái cần cho render TUI.
 type UISnapshot struct {
 	Provider             string
 	BookTitle            string
 	ModelName            string
-	ModelContextWindow   int // 当前默认模型的上下文窗口（随 /model 切换实时解析）
+	ModelContextWindow   int // cửa sổ ngữ cảnh của model mặc định hiện tại (resolve theo thời gian thực khi /model chuyển)
 	ThinkingLevel        string
 	Style                string
 	RuntimeState         string // idle / running / pausing / paused / completed
@@ -74,60 +74,60 @@ type UISnapshot struct {
 	IsRunning            bool
 	Agents               []AgentSnapshot
 
-	// 累计用量（整个会话，跨所有 agent 与模型切换）
+	// Lượng dùng tích lũy (toàn phiên, xuyên qua mọi agent và lần đổi model)
 	TotalInputTokens      int
 	TotalOutputTokens     int
 	TotalCacheReadTokens  int
 	TotalCacheWriteTokens int
 	TotalCostUSD          float64
-	TotalSavedUSD         float64 // 因 CacheRead 命中省下的美元（相对全按非缓存输入价计费）
-	BudgetLimitUSD        float64 // 预算上限（config budget.book_usd）；0 = 未启用
+	TotalSavedUSD         float64 // USD tiết kiệm được nhờ hit CacheRead (so với tính toàn bộ input theo giá không cache)
+	BudgetLimitUSD        float64 // hạn mức ngân sách (config budget.book_usd); 0 = chưa bật
 
-	// 缓存诊断
-	OverallCacheCapable    bool // 至少一个 role 跑过支持 prompt cache 的模型（区分"未启用"和"0% 命中"）
-	OverallRecentCacheRead int  // 滑动窗最近 N 次的 cacheRead 总和
-	OverallRecentInput     int  // 滑动窗最近 N 次的 input 总和
-	OverallRecentSamples   int  // 滑动窗内的样本数（≤ recentSampleCap）
-	TotalCacheBreaks       int  // live 检测到的缓存链断裂次数（前缀未缩短而命中骤降），详见 usage.go noteCacheBreak
+	// Chẩn đoán cache
+	OverallCacheCapable    bool // ít nhất một role từng chạy model hỗ trợ prompt cache (phân biệt "chưa bật" với "0% hit")
+	OverallRecentCacheRead int  // tổng cacheRead của N lần gần nhất trong cửa sổ trượt
+	OverallRecentInput     int  // tổng input của N lần gần nhất trong cửa sổ trượt
+	OverallRecentSamples   int  // số mẫu trong cửa sổ trượt (≤ recentSampleCap)
+	TotalCacheBreaks       int  // số lần đứt gãy chuỗi cache phát hiện trên live (tiền tố không ngắn lại mà hit giảm mạnh), xem usage.go noteCacheBreak
 
-	// MissingAssistantUsage > 0 通常意味着上游 streaming 没按 OpenAI
-	// stream_options.include_usage 协议发 final usage chunk（自建 proxy 常见），
-	// 导致 UsageTracker 收不到任何累计数据。UI 据此明示用户排查 backend，
-	// 不要让用户误以为是缓存模块本身坏了。
+	// MissingAssistantUsage > 0 thường nghĩa là upstream streaming không gửi final usage
+	// chunk theo protocol OpenAI stream_options.include_usage (thường thấy ở proxy tự dựng),
+	// khiến UsageTracker không nhận được bất kỳ dữ liệu tích lũy nào. UI dựa đó báo rõ người dùng điều tra backend,
+	// đừng để người dùng tưởng module cache tự nó hỏng.
 	MissingAssistantUsage int
 
-	// 缓存 per-role 维度，按 CacheRead 降序，已过滤未消费 token 的 role
+	// Chiều cache per-role, giảm dần theo CacheRead, đã lọc role chưa tiêu thụ token
 	CachePerAgent []AgentCacheStat
 	CachePerModel []AgentCacheStat
 
-	// 基础设定
+	// Thiết lập nền
 	Synopsis         string
 	Premise          string
 	Outline          []OutlineSnapshot
 	Characters       []string
-	SupportingCount  int      // 配角名册中的次要角色总数
-	RecentSupporting []string // 最近活跃的次要角色（最多 5 个，按 LastSeenChapter 倒序）
+	SupportingCount  int      // tổng số nhân vật phụ trong danh sách diễn viên phụ
+	RecentSupporting []string // nhân vật phụ hoạt động gần đây (tối đa 5, giảm dần theo LastSeenChapter)
 	Layered          bool
 	CurrentVolumeArc string
 	NextVolumeTitle  string
 	CompassDirection string
 	CompassScale     string
 
-	// 详情
+	// Chi tiết
 	LastCommitSummary  string
 	LastReviewSummary  string
 	LastCheckpointName string
 	RecentSummaries    []string
 }
 
-// OutlineSnapshot 是大纲条目的展示摘要。
+// OutlineSnapshot là tóm tắt hiển thị của một mục dàn ý.
 type OutlineSnapshot struct {
 	Chapter   int
 	Title     string
 	CoreEvent string
 }
 
-// AgentSnapshot 是 Agent 状态的展示投影。
+// AgentSnapshot là phép chiếu hiển thị trạng thái Agent.
 type AgentSnapshot struct {
 	Name      string
 	State     string
@@ -140,14 +140,14 @@ type AgentSnapshot struct {
 	UpdatedAt time.Time
 }
 
-// AgentCacheStat 是单个 agent 的缓存命中累计（投影到左栏）。
-// HitRate = CacheRead / Input；Input 在 litellm 层已统一为"含 CacheRead"语义。
+// AgentCacheStat là tích lũy hit cache của một agent (chiếu lên cột trái).
+// HitRate = CacheRead / Input; Input ở tầng litellm đã thống nhất ngữ nghĩa "gồm CacheRead".
 //
-// CacheCapable 用来区分两种 0% 命中：
-//   - true  → 模型支持 prompt cache，0% 是 prompt 设计差或前缀不稳定，需要优化
-//   - false → 模型/provider 不支持 prompt cache，0% 是预期，不必排查
+// CacheCapable dùng phân biệt hai loại 0% hit:
+//   - true  → model hỗ trợ prompt cache, 0% là do thiết kế prompt kém hoặc tiền tố không ổn định, cần tối ưu
+//   - false → model/provider không hỗ trợ prompt cache, 0% là đúng như kỳ vọng, không cần điều tra
 //
-// Recent* 是滑动窗（最近 N 次调用）的命中数据，对比累计可识别"前期拖累"vs"稳态低命中"。
+// Recent* là dữ liệu hit của cửa sổ trượt (N lần gọi gần nhất), so với tích lũy để nhận ra "kéo lê giai đoạn đầu" với "tỷ lệ thấp ổn định".
 type AgentCacheStat struct {
 	Role            string
 	Model           string
@@ -163,7 +163,7 @@ type AgentCacheStat struct {
 	RecentSamples   int
 }
 
-// AgentContextSnapshot 是 Agent 上下文使用情况。
+// AgentContextSnapshot là tình trạng sử dụng ngữ cảnh của Agent.
 type AgentContextSnapshot struct {
 	Tokens          int
 	ContextWindow   int
@@ -176,16 +176,16 @@ type AgentContextSnapshot struct {
 	KeptCount       int
 }
 
-// CoCreateMessage 是共创对话的消息。
+// CoCreateMessage là tin nhắn của cuộc đối thoại đồng sáng tạo.
 type CoCreateMessage struct {
 	Role    string `json:"role"`
 	Content string `json:"content"`
 }
 
-// CoCreateReply 是共创对话的 LLM 回复。Raw 保留模型完整四段原文，
-// 用于写回 history 让下一轮模型看到自己上一轮的 [DRAFT]，从而真正在
-// 已有草稿上累积更新（仅 Message 不含 [DRAFT]，会导致模型每轮凭对话重新归纳）。
-// Suggestions 是 AI 主动给的"接下来你可能想说"，用户卡壳时按数字键一键填入输入框。
+// CoCreateReply là phản hồi LLM của cuộc đối thoại đồng sáng tạo. Raw giữ nguyên văn đủ bốn đoạn của model,
+// dùng để ghi lại history cho vòng sau model thấy được [DRAFT] của mình vòng trước, từ đó thật sự cập nhật
+// cộng dồn trên bản nháp sẵn có (chỉ Message không chứa [DRAFT] sẽ khiến model mỗi vòng tổng kết lại từ đối thoại).
+// Suggestions là những gợi ý "tiếp theo bạn có thể muốn nói" do AI chủ động đưa, khi bí ý bấm phím số điền ngay vào ô nhập.
 type CoCreateReply struct {
 	Message     string
 	Prompt      string

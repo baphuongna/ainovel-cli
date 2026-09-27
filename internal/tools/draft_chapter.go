@@ -13,8 +13,8 @@ import (
 	"github.com/voocel/ainovel-cli/internal/store"
 )
 
-// DraftChapterTool 写入整章草稿，替代旧的 write_scene + polish_chapter 流水线。
-// Agent 自主决定一次写完还是分批续写。
+// DraftChapterTool ghi bản nháp cả chương, thay thế pipeline write_scene + polish_chapter cũ.
+// Agent tự quyết viết xong một lần hay viết nối theo từng đợt.
 type DraftChapterTool struct {
 	store *store.Store
 }
@@ -25,26 +25,26 @@ func NewDraftChapterTool(store *store.Store) *DraftChapterTool {
 
 func (t *DraftChapterTool) Name() string { return "draft_chapter" }
 func (t *DraftChapterTool) Description() string {
-	return "写入章节正文。mode=write 覆盖写入整章，mode=append 追加到现有草稿（续写/修改）"
+	return "Ghi nội dung chương. mode=write ghi đè cả chương, mode=append nối thêm vào bản nháp hiện có (viết nối/chỉnh sửa)"
 }
-func (t *DraftChapterTool) Label() string { return "写入章节" }
+func (t *DraftChapterTool) Label() string { return "Ghi chương" }
 
-// 写工具，禁止并发（读-改-写竞态）。
+// Công cụ ghi, cấm đồng thời (đua đọc-sửa-ghi).
 func (t *DraftChapterTool) ReadOnly(_ json.RawMessage) bool        { return false }
 func (t *DraftChapterTool) ConcurrencySafe(_ json.RawMessage) bool { return false }
 
 func (t *DraftChapterTool) Schema() map[string]any {
-	// mode 标 required 是为了兼容 OpenAI strict tool calling——strict 模式
-	// 要求所有 properties 都在 required 列表中。原来的"省略 mode 走 write
-	// 默认"行为现在需要模型显式传 mode="write"，Execute 的 default 分支不变。
+	// mode được đánh required để tương thích strict tool calling của OpenAI — chế độ strict
+	// yêu cầu mọi properties đều nằm trong danh sách required. Hành vi cũ "bỏ qua mode thì theo mặc định
+	// write" giờ buộc model phải truyền tường minh mode="write", nhánh default trong Execute không đổi.
 	return schema.Object(
-		schema.Property("chapter", schema.Int("章节号")).Required(),
-		schema.Property("content", schema.String("章节正文")).Required(),
-		schema.Property("mode", schema.Enum("写入模式", "write", "append")).Required(),
+		schema.Property("chapter", schema.Int("số chương")).Required(),
+		schema.Property("content", schema.String("nội dung chương")).Required(),
+		schema.Property("mode", schema.Enum("chế độ ghi", "write", "append")).Required(),
 	)
 }
 
-// StrictSchema 要求 Provider 保证工具参数符合 schema。
+// StrictSchema yêu cầu Provider bảo đảm tham số công cụ tuân theo schema.
 func (t *DraftChapterTool) StrictSchema() bool { return true }
 
 func (t *DraftChapterTool) Execute(_ context.Context, args json.RawMessage) (json.RawMessage, error) {
@@ -73,7 +73,7 @@ func (t *DraftChapterTool) Execute(_ context.Context, args json.RawMessage) (jso
 		return nil, fmt.Errorf("load progress: %w: %w", errs.ErrStoreRead, err)
 	}
 	if completed {
-		// 打磨/重写路径：章节虽已完成，但仍在 pending_rewrites 中，允许覆盖草稿
+		// Nhánh đánh bóng/viết lại: chương tuy đã hoàn thành nhưng vẫn còn trong pending_rewrites, cho phép ghi đè bản nháp
 		progress, err := t.store.Progress.Load()
 		if err != nil {
 			return nil, fmt.Errorf("load progress: %w: %w", errs.ErrStoreRead, err)
@@ -84,7 +84,7 @@ func (t *DraftChapterTool) Execute(_ context.Context, args json.RawMessage) (jso
 				"chapter":   a.Chapter,
 				"skipped":   true,
 				"completed": true,
-				"reason":    fmt.Sprintf("第 %d 章已提交完成，不能覆盖", a.Chapter),
+				"reason":    fmt.Sprintf("chương %d đã nộp hoàn thành, không thể ghi đè", a.Chapter),
 			})
 		}
 	}
@@ -112,7 +112,7 @@ func (t *DraftChapterTool) Execute(_ context.Context, args json.RawMessage) (jso
 			"chapter":    a.Chapter,
 			"mode":       "append",
 			"word_count": utf8.RuneCountInString(full),
-			"next_step":  "先 read_chapter(source=draft) 回读草稿，再调用 check_consistency，最后 commit_chapter",
+			"next_step":  "đọc lại bản nháp bằng read_chapter(source=draft) trước, rồi gọi check_consistency, cuối cùng commit_chapter",
 		})
 	default: // write
 		if err := t.store.Drafts.SaveDraft(a.Chapter, a.Content); err != nil {
@@ -129,7 +129,7 @@ func (t *DraftChapterTool) Execute(_ context.Context, args json.RawMessage) (jso
 			"chapter":    a.Chapter,
 			"mode":       "write",
 			"word_count": utf8.RuneCountInString(a.Content),
-			"next_step":  "先 read_chapter(source=draft) 回读草稿，再调用 check_consistency，最后 commit_chapter",
+			"next_step":  "đọc lại bản nháp bằng read_chapter(source=draft) trước, rồi gọi check_consistency, cuối cùng commit_chapter",
 		})
 	}
 }

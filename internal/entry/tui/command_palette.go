@@ -77,8 +77,9 @@ func (m *Model) clearCommandPalette() {
 	m.compActive = false
 }
 
-// syncCommandInputHighlight 复用命令注册表识别第一个 token。只记录完整、已注册的
-// 命令；最终渲染时仅给这个 token 着色，参数保持普通正文色。
+// syncCommandInputHighlight tái dùng bảng đăng ký lệnh nhận diện token đầu tiên. Chỉ ghi
+// nhận lệnh đầy đủ, đã đăng ký; khi render cuối chỉ tô màu token này, tham số giữ màu
+// chính văn bình thường.
 func (m *Model) syncCommandInputHighlight() {
 	m.commandToken = ""
 	fields := strings.Fields(m.textarea.Value())
@@ -179,8 +180,9 @@ func renderCommandPalette(width int, items []commandPaletteItem, cursor int) str
 		}
 
 		name := nameRenderer.Render(item.Name)
-		// truncateWidth 按视觉宽度截断（中文字符算 2 列）；用 truncate 会按 rune 数算，
-		// 中文场景实际宽度 = 期望的 2 倍，导致弹窗溢出。
+		// truncateWidth cắt theo chiều rộng trực quan (ký tự Hán tính 2 cột); dùng truncate
+		// sẽ tính theo số rune, bối cảnh chữ Hán độ rộng thực = gấp đôi kỳ vọng, làm modal
+		// tràn.
 		desc := truncateWidth(item.Description, max(12, contentW-18))
 		descText := descRenderer.Render(desc)
 		line := prefix + name
@@ -194,16 +196,16 @@ func renderCommandPalette(width int, items []commandPaletteItem, cursor int) str
 	if selectedIdx < 0 || selectedIdx >= len(visible) {
 		selectedIdx = 0
 	}
-	hint := mutedStyle.Render("↑↓ 选择 · Tab/Enter 接受 · Esc 关闭")
+	hint := mutedStyle.Render("↑↓ chọn · Tab/Enter chấp nhận · Esc đóng")
 	usage := "Usage: " + visible[selectedIdx].Usage
 	if remaining > 0 {
-		usage = usage + " · 还有 " + strconv.Itoa(remaining) + " 个命令"
+		usage = usage + " · còn " + strconv.Itoa(remaining) + " lệnh"
 	}
 	usageLine := mutedStyle.Render(truncateWidth(usage, contentW))
 	body = append(body, usageLine+strings.Repeat(" ", max(0, contentW-lipgloss.Width(usageLine))))
 	body = append(body, hint+strings.Repeat(" ", max(0, contentW-lipgloss.Width(hint))))
 
-	return renderPaddedModalFrame(boxW, len(body)+2, "命令", "", body)
+	return renderPaddedModalFrame(boxW, len(body)+2, "Lệnh", "", body)
 }
 
 func commandPaletteWindow(total, cursor, limit int) (start, end int) {

@@ -201,8 +201,8 @@ func TestSaveReviewRejectsIssueOutsideChapterScope(t *testing.T) {
 	}
 }
 
-// TestSaveReviewKeepsModelDefinedDimension 验证工具不再把文学评价维度和分数阈值
-// 写死在 Go 中；Editor 可以按当前任务补充更准确的评价面。
+// TestSaveReviewKeepsModelDefinedDimension kiểm chứng công cụ không còn viết cứng chiều đánh giá văn học
+// và ngưỡng điểm trong Go; Editor có thể bổ sung mặt đánh giá chính xác hơn theo nhiệm vụ hiện tại.
 func TestSaveReviewKeepsModelDefinedDimension(t *testing.T) {
 	s := store.NewStore(t.TempDir())
 	if err := s.Init(); err != nil {
@@ -309,10 +309,10 @@ func TestSaveReviewRejectsIssueWithoutEvidence(t *testing.T) {
 	}
 }
 
-// TestSaveReviewDoesNotDirtyQueueOnIllegalFlowTransition 防回归：返工排空中途
-// （Flow=rewriting、PendingRewrites=[8,9]）对已重写章复审得到 polish 时，
-// Flow=polishing 与 rewriting 构成非法迁移。ApplyReviewOutcome 必须在同一次写锁中
-// 完成校验和写入，非法迁移时队列保持不变。
+// TestSaveReviewDoesNotDirtyQueueOnIllegalFlowTransition phòng hồi quy: giữa chừng cạn hàng đợi viết lại
+// (Flow=rewriting, PendingRewrites=[8,9]) tái xem xét chương đã viết lại nhận polish,
+// thì Flow=polishing với rewriting cấu thành chuyển dịch bất hợp pháp. ApplyReviewOutcome phải trong cùng một khóa ghi
+// hoàn tất kiểm tra và ghi, chuyển dịch bất hợp pháp thì hàng đợi giữ nguyên.
 func TestSaveReviewDoesNotDirtyQueueOnIllegalFlowTransition(t *testing.T) {
 	s := store.NewStore(t.TempDir())
 	if err := s.Init(); err != nil {
@@ -366,10 +366,10 @@ func TestSaveReviewDoesNotDirtyQueueOnIllegalFlowTransition(t *testing.T) {
 
 	p, _ := s.Progress.Load()
 	if len(p.PendingRewrites) != 2 || p.PendingRewrites[0] != 8 || p.PendingRewrites[1] != 9 {
-		t.Fatalf("PendingRewrites 不应被脏写，期望 [8 9]，got %v", p.PendingRewrites)
+		t.Fatalf("PendingRewrites không được bị ghi bẩn, kỳ vọng [8 9], got %v", p.PendingRewrites)
 	}
 	if p.Flow != domain.FlowRewriting {
-		t.Fatalf("Flow 应保持 rewriting，got %s", p.Flow)
+		t.Fatalf("Flow nên giữ rewriting, got %s", p.Flow)
 	}
 }
 
@@ -385,7 +385,7 @@ func TestSaveReviewKeepsOutcomeWhenReviewArtifactWriteFails(t *testing.T) {
 	if err := s.Progress.MarkChapterComplete(3, 3000, "", ""); err != nil {
 		t.Fatalf("MarkChapterComplete: %v", err)
 	}
-	// 让目标文件路径成为目录，稳定触发原子 rename 失败。
+	// Biến đường dẫn tệp đích thành thư mục, chọc thất bại rename nguyên tử một cách ổn định.
 	if err := os.MkdirAll(filepath.Join(dir, "reviews", "03.json"), 0o755); err != nil {
 		t.Fatal(err)
 	}
@@ -418,7 +418,7 @@ func TestSaveReviewKeepsOutcomeWhenReviewArtifactWriteFails(t *testing.T) {
 		t.Fatal(err)
 	}
 	if p.Flow != domain.FlowPolishing || len(p.PendingRewrites) != 1 || p.PendingRewrites[0] != 3 {
-		t.Fatalf("审阅工件失败后返工意图必须保持可恢复，got flow=%s queue=%v", p.Flow, p.PendingRewrites)
+		t.Fatalf("tác phẩm xem xét thất bại thì ý định viết lại phải giữ được khả năng phục hồi, got flow=%s queue=%v", p.Flow, p.PendingRewrites)
 	}
 }
 
@@ -452,7 +452,7 @@ func setupArcReviewStore(t *testing.T) *store.Store {
 			t.Fatal(err)
 		}
 	}
-	// 第一弧已经完整收尾，因此 Router 当前唯一待补工件是第二弧评审。
+	// Cung thứ nhất đã thu hồi trọn vẹn, nên tác phẩm duy nhất Router còn chờ bổ sung là xem xét cung thứ hai.
 	if err := s.World.SaveReview(domain.ReviewEntry{Chapter: 2, Scope: "arc", Verdict: "accept", Summary: "第一弧评审"}); err != nil {
 		t.Fatal(err)
 	}

@@ -50,7 +50,7 @@ func TestCallStructuredUsesNativeSchemaWithoutPromptDuplication(t *testing.T) {
 		t.Fatalf("response format = %#v", format)
 	}
 	if got := model.messages[0].TextContent(); got != prompt {
-		t.Fatalf("native prompt 被重复注入 schema: %s", got)
+		t.Fatalf("native prompt bị bơm lặp schema: %s", got)
 	}
 }
 
@@ -62,10 +62,10 @@ func TestCallStructuredPromptModeInjectsContract(t *testing.T) {
 		t.Fatalf("callStructured: %v", err)
 	}
 	if model.config.ResponseFormat != nil {
-		t.Fatalf("prompt mode 不应发送 response_format: %#v", model.config.ResponseFormat)
+		t.Fatalf("prompt mode không nên gửi response_format: %#v", model.config.ResponseFormat)
 	}
 	if !strings.Contains(model.messages[0].TextContent(), "<output-json-schema>") {
-		t.Fatalf("prompt mode 未注入契约: %s", model.messages[0].TextContent())
+		t.Fatalf("prompt mode chưa bơm hợp đồng: %s", model.messages[0].TextContent())
 	}
 }
 

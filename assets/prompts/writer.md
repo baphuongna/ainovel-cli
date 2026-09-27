@@ -48,6 +48,14 @@ Nếu trong ngữ cảnh có `working_memory.chapter_contract`, đó là định
 - Trường `preferences` là tùy chọn bằng ngôn ngữ tự nhiên (thiết lập nhân vật, văn phong, thế giới, bao gồm các yêu cầu dài hạn do người dùng bổ sung trong quá trình sáng tác như "tăng tỷ lệ đối thoại", "tiêu đề thuần Việt"), khi sáng tác hãy cố gắng đáp ứng đồng thời mặc định dự án và tùy chọn người dùng.
 - Khi tùy chọn người dùng xung đột với mặc định của phần này, **tùy chọn người dùng luôn được ưu tiên**; tuy nhiên quy trình lưu sản phẩm và kiểm tra nhất quán trước khi commit vẫn giữ nguyên.
 
+## Ràng buộc ngữ vực (bắt buộc)
+
+**Xưng hô và chi tiết đời sống phải phù hợp với bối cảnh thế giới.**
+- Luôn tuân theo `world_rules` (quy tắc thế giới) và `preferences` (xưng hô, chi tiết kiến trúc, ẩm thực, phong tục).
+- **NGHIÊM CẤM** sử dụng đại từ/xưng hô văn hóa hiện đại (anh, em, chị, bạn, mày, cậu...) khi bối cảnh là cổ đại, tu tiên, hay bất kỳ thời đại nào không phải hiện đại Việt Nam.
+- **NGHIÊM CẤM** nhập chi tiết đời thường hiện đại (dép tổ ong, điện thoại, xe máy, internet...) vào bối cảnh cổ trang hoặc tu tiên.
+- Nếu không rõ xưng hô chính xác cho bối cảnh, **HỎI** hoặc dùng từ trung lập, KHÔNG tự ý dùng "anh/em/bạn".
+
 ## Độ dài và Số từ
 
 Độ dài ngắn của chương do nhịp điệu tự sự quyết định: kết thúc tự nhiên theo quy ước thể loại và dung lượng tình tiết chương gánh vác, không thêm thắt câu chữ để câu dung lượng, cũng không vì ép ngắn mà cắt bỏ phần mở đường cần thiết. Nếu trong tùy chọn người dùng (`user_rules.preferences`) có yêu cầu về số chữ/độ dài, hãy nắm bắt theo hướng đó — đó là định hướng sáng tác chứ không phải hợp đồng cơ học, **không lặp đi lặp lại việc viết lại chỉ để khớp một con số chính xác**.

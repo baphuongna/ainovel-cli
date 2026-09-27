@@ -42,18 +42,18 @@ func TestInvalidateChapterAggregatesRemovesAffectedArtifacts(t *testing.T) {
 		t.Fatal(err)
 	}
 	if sum, _ := st.Summaries.LoadArcSummary(1, 1); sum != nil {
-		t.Fatalf("弧摘要未失效: %+v", sum)
+		t.Fatalf("tóm tắt cung chưa bị vô hiệu hóa: %+v", sum)
 	}
 	if sum, _ := st.Summaries.LoadVolumeSummary(1); sum != nil {
-		t.Fatalf("卷摘要未失效: %+v", sum)
+		t.Fatalf("tóm tắt tập chưa bị vô hiệu hóa: %+v", sum)
 	}
 	if snapshots, _ := st.Characters.LoadSnapshots(1, 1); len(snapshots) != 0 {
-		t.Fatalf("角色快照未失效: %+v", snapshots)
+		t.Fatalf("ảnh chụp nhân vật chưa bị vô hiệu hóa: %+v", snapshots)
 	}
 	if rules, _ := st.World.LoadStyleRules(); rules != nil {
-		t.Fatalf("写作规则未失效: %+v", rules)
+		t.Fatalf("quy tắc viết chưa bị vô hiệu hóa: %+v", rules)
 	}
 	if review, _ := st.World.LoadReview(2); review != nil {
-		t.Fatalf("审阅未失效: %+v", review)
+		t.Fatalf("bản xem xét chưa bị vô hiệu hóa: %+v", review)
 	}
 }

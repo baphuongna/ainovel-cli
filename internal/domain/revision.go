@@ -16,7 +16,8 @@ const (
 	ChapterOriginUser      ChapterOrigin = "user"
 )
 
-// ChapterFacts 是一章正文对应的完整结构化事实，也是所有派生状态的输入。
+// ChapterFacts là toàn bộ sự kiện có cấu trúc tương ứng với chính văn một chương, cũng là
+// đầu vào của mọi trạng thái suy ra.
 type ChapterFacts struct {
 	Title               string              `json:"title"`
 	Summary             string              `json:"summary"`
@@ -32,14 +33,14 @@ type ChapterFacts struct {
 	Feedback            *OutlineFeedback    `json:"feedback,omitempty"`
 }
 
-// StyleDelta 记录用户修订相对系统版本体现出的写作偏好。
+// StyleDelta ghi lại thiên hướng viết thể hiện qua bản sửa của người dùng so với phiên bản hệ thống.
 type StyleDelta struct {
 	Prose    []string         `json:"prose"`
 	Dialogue []CharacterVoice `json:"dialogue"`
 	Taboos   []string         `json:"taboos"`
 }
 
-// MergeStyleDelta 合并持久风格证据并保持规则唯一。
+// MergeStyleDelta gộp bằng chứng phong cách bền và giữ quy tắc duy nhất.
 func MergeStyleDelta(base, next StyleDelta) StyleDelta {
 	merged := StyleDelta{
 		Prose:  mergeTextRules(base.Prose, next.Prose),
@@ -77,8 +78,8 @@ func mergeTextRules(groups ...[]string) []string {
 	return result
 }
 
-// ChapterRecord 保存最近一次已接纳的章节正文及其完整事实。
-// chapters/*.md 是可编辑工作区，本记录是判断外部修订的基线。
+// ChapterRecord lưu chính văn chương đã tiếp nhận gần nhất cùng toàn bộ sự kiện của nó.
+// chapters/*.md là vùng làm việc chỉnh sửa được, bản ghi này là baseline phán định sửa đổi từ bên ngoài.
 type ChapterRecord struct {
 	Version       int           `json:"version"`
 	Chapter       int           `json:"chapter"`
@@ -91,7 +92,7 @@ type ChapterRecord struct {
 	AcceptedAt    time.Time     `json:"accepted_at"`
 }
 
-// AuthorRevisionStyle 是所有已接纳用户修订的确定性风格投影。
+// AuthorRevisionStyle là phép chiếu phong cách tất định của mọi bản sửa người dùng đã tiếp nhận.
 type AuthorRevisionStyle struct {
 	Prose     []string         `json:"prose"`
 	Dialogue  []CharacterVoice `json:"dialogue"`

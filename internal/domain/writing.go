@@ -2,8 +2,8 @@ package domain
 
 import "strings"
 
-// ChapterPlan 章节写作构思，Writer 自主生成。
-// 不再强制场景拆分，Agent 自己决定如何组织内容。
+// ChapterPlan ý tưởng viết chương, Writer tự sinh.
+// Không còn ép tách cảnh, Agent tự quyết định cách tổ chức nội dung.
 type ChapterPlan struct {
 	Chapter    int             `json:"chapter"`
 	Title      string          `json:"title"`
@@ -11,23 +11,24 @@ type ChapterPlan struct {
 	Conflict   string          `json:"conflict"`
 	Hook       string          `json:"hook"`
 	EmotionArc string          `json:"emotion_arc,omitempty"`
-	Notes      string          `json:"notes,omitempty"` // Agent 的自由备忘
+	Notes      string          `json:"notes,omitempty"` // ghi chú tự do của Agent
 	Contract   ChapterContract `json:"contract,omitempty"`
 }
 
-// ChapterContract 是 Writer 和 Editor 共享的章节验收契约。
-// 它定义本章必须完成的推进项、禁止越界项以及审阅关注点。
+// ChapterContract là hợp đồng nghiệm thu chương mà Writer và Editor dùng chung.
+// Nó định nghĩa các mục đẩy chuyện bắt buộc phải hoàn thành của chương, các mục cấm vượt
+// ranh giới và các điểm cần lưu ý khi xem xét.
 type ChapterContract struct {
-	RequiredBeats    []string `json:"required_beats,omitempty"`    // 本章必须落地的推进项
-	ForbiddenMoves   []string `json:"forbidden_moves,omitempty"`   // 本章明确不能发生的推进
-	ContinuityChecks []string `json:"continuity_checks,omitempty"` // 本章需特别核对的连续性点
-	EvaluationFocus  []string `json:"evaluation_focus,omitempty"`  // Editor 需要重点检查的点
-	EmotionTarget    string   `json:"emotion_target,omitempty"`    // 可选：本章希望读者主要感受到的情绪
-	PayoffPoints     []string `json:"payoff_points,omitempty"`     // 可选：关键章希望回应的情节点/兑现点
-	HookGoal         string   `json:"hook_goal,omitempty"`         // 可选：章末钩子希望驱动的追读欲望
+	RequiredBeats    []string `json:"required_beats,omitempty"`    // các mục đẩy chuyện bắt buộc phải có trong chương này
+	ForbiddenMoves   []string `json:"forbidden_moves,omitempty"`   // các nước đi rõ ràng không được xảy ra trong chương này
+	ContinuityChecks []string `json:"continuity_checks,omitempty"` // các điểm liên tục cần đối chiếu đặc biệt trong chương này
+	EvaluationFocus  []string `json:"evaluation_focus,omitempty"`  // các điểm Editor cần kiểm tra trọng tâm
+	EmotionTarget    string   `json:"emotion_target,omitempty"`    // tùy chọn: cảm xúc chính muốn độc giả cảm nhận ở chương này
+	PayoffPoints     []string `json:"payoff_points,omitempty"`     // tùy chọn: các điểm sự kiện/điểm chi trả muốn hồi ứng ở chương trọng yếu
+	HookGoal         string   `json:"hook_goal,omitempty"`         // tùy chọn: ham muốn đọc tiếp mà móc cuối chương muốn dẫn dắt
 }
 
-// ChapterSummary 章节摘要，供后续章节的上下文窗口使用。
+// ChapterSummary tóm tắt chương, dùng cho cửa sổ ngữ cảnh của các chương sau.
 type ChapterSummary struct {
 	Chapter    int      `json:"chapter"`
 	Title      string   `json:"title"`
@@ -36,7 +37,7 @@ type ChapterSummary struct {
 	KeyEvents  []string `json:"key_events"`
 }
 
-// ArcSummary 弧级摘要，弧结束时由 Editor 生成。
+// ArcSummary tóm tắt cấp cung, Editor sinh khi kết thúc cung.
 type ArcSummary struct {
 	Volume    int      `json:"volume"`
 	Arc       int      `json:"arc"`
@@ -45,7 +46,7 @@ type ArcSummary struct {
 	KeyEvents []string `json:"key_events"`
 }
 
-// VolumeSummary 卷级摘要，卷结束时生成。
+// VolumeSummary tóm tắt cấp tập, sinh khi kết thúc tập.
 type VolumeSummary struct {
 	Volume    int      `json:"volume"`
 	Title     string   `json:"title"`
@@ -53,7 +54,7 @@ type VolumeSummary struct {
 	KeyEvents []string `json:"key_events"`
 }
 
-// CharacterSnapshot 角色状态快照，弧边界时记录。
+// CharacterSnapshot snapshot trạng thái nhân vật, ghi tại ranh giới cung.
 type CharacterSnapshot struct {
 	Volume     int    `json:"volume"`
 	Arc        int    `json:"arc"`
@@ -64,37 +65,38 @@ type CharacterSnapshot struct {
 	Relations  string `json:"relations,omitempty"`
 }
 
-// OutlineFeedback Writer 对大纲的反馈，提交章节时可选。
+// OutlineFeedback phản hồi của Writer cho dàn ý, tùy chọn khi nộp chương.
 type OutlineFeedback struct {
-	Deviation  string `json:"deviation"`  // 偏离描述
-	Suggestion string `json:"suggestion"` // 调整建议
+	Deviation  string `json:"deviation"`  // mô tả sự lệch khỏi dàn ý
+	Suggestion string `json:"suggestion"` // góp ý điều chỉnh
 }
 
-// WritingStyleRules 从已写章节中提炼的写作规则，弧边界时由 Editor 生成。
-// 取代原文片段（style_anchors / voice_samples），用规则替代搬运原文。
+// WritingStyleRules quy tắc viết chưng cất từ các chương đã viết, Editor sinh tại ranh giới cung.
+// Thay thế các đoạn văn gốc (style_anchors / voice_samples), dùng quy tắc thay cho việc chép nguyên văn.
 type WritingStyleRules struct {
 	Volume    int              `json:"volume"`
 	Arc       int              `json:"arc"`
-	Prose     []string         `json:"prose"`      // 3-5 条叙述风格规则，每条 ≤50 字
-	Dialogue  []CharacterVoice `json:"dialogue"`   // 角色对话风格规则
-	Taboos    []string         `json:"taboos"`     // 禁忌清单
-	UpdatedAt string           `json:"updated_at"` // ISO8601 时间戳
+	Prose     []string         `json:"prose"`      // 3-5 quy tắc phong cách tự sự, mỗi quy tắc ≤50 ký tự
+	Dialogue  []CharacterVoice `json:"dialogue"`   // quy tắc phong cách thoại của nhân vật
+	Taboos    []string         `json:"taboos"`     // danh sách điều cấm
+	UpdatedAt string           `json:"updated_at"` // dấu thời gian ISO8601
 }
 
-// CharacterVoice 单个角色的对话风格规则。
+// CharacterVoice quy tắc phong cách thoại của một nhân vật.
 type CharacterVoice struct {
 	Name  string   `json:"name"`
-	Rules []string `json:"rules"` // 2-3 条语言特征规则，每条 ≤30 字
+	Rules []string `json:"rules"` // 2-3 quy tắc đặc trưng ngôn ngữ, mỗi quy tắc ≤30 ký tự
 }
 
-// RelatedChapter 推荐回读的相关章节。
+// RelatedChapter chương liên quan được khuyến nghị đọc lại.
 type RelatedChapter struct {
 	Chapter int    `json:"chapter"`
 	Reason  string `json:"reason"`
 }
 
-// RecallItem 是按当前任务选择性召回的长期信息。
-// 它不替代正式工件，只负责把当前轮真正相关的少量历史信息回注给模型。
+// RecallItem là thông tin dài hạn được triệu hồi chọn lọc theo nhiệm vụ hiện tại.
+// Nó không thay thế công cụ chính thức, chỉ chịu trách nhiệm đưa lại cho model một lượng nhỏ
+// thông tin lịch sử thực sự liên quan đến lượt hiện tại.
 type RecallItem struct {
 	Kind    string `json:"kind"`
 	Key     string `json:"key,omitempty"`
@@ -103,8 +105,8 @@ type RecallItem struct {
 	Summary string `json:"summary,omitempty"`
 }
 
-// CommitResult 是 commit_chapter 工具的结构化返回值。
-// 只包含事实字段；"下一步做什么"由 Reminder 通道基于当前 Progress 自行生成。
+// CommitResult là giá trị trả về có cấu trúc của công cụ commit_chapter.
+// Chỉ gồm các trường sự kiện; "bước kế tiếp làm gì" do kênh Reminder tự sinh dựa trên Progress hiện tại.
 type CommitResult struct {
 	Chapter        int              `json:"chapter"`
 	Committed      bool             `json:"committed"`
@@ -115,25 +117,26 @@ type CommitResult struct {
 	HookType       string           `json:"hook_type,omitempty"`
 	DominantStrand string           `json:"dominant_strand,omitempty"`
 	Feedback       *OutlineFeedback `json:"feedback,omitempty"`
-	// 长篇分层信号
+	// Tín hiệu phân tầng truyện dài
 	ArcEnd         bool `json:"arc_end,omitempty"`
 	VolumeEnd      bool `json:"volume_end,omitempty"`
 	Volume         int  `json:"volume,omitempty"`
 	Arc            int  `json:"arc,omitempty"`
-	NeedsExpansion bool `json:"needs_expansion,omitempty"`  // 下一弧是骨架，需要展开章节
-	NeedsNewVolume bool `json:"needs_new_volume,omitempty"` // 需要 Architect 创建下一卷
-	NextVolume     int  `json:"next_volume,omitempty"`      // 下一弧/卷序号
-	NextArc        int  `json:"next_arc,omitempty"`         // 下一弧序号
-	// 完成态事实：本次 commit 后是否整本书已完成
+	NeedsExpansion bool `json:"needs_expansion,omitempty"`  // cung kế tiếp là khung xương, cần mở rộng chương
+	NeedsNewVolume bool `json:"needs_new_volume,omitempty"` // cần Architect dựng tập kế tiếp
+	NextVolume     int  `json:"next_volume,omitempty"`      // số thứ tự tập/cung kế tiếp
+	NextArc        int  `json:"next_arc,omitempty"`         // số thứ tự cung kế tiếp
+	// Sự kiện trạng thái hoàn tất: sau lần commit này toàn sách đã hoàn thành hay chưa
 	BookComplete bool `json:"book_complete,omitempty"`
-	// 当前 Progress.Flow 快照（writing / reviewing / rewriting / polishing）
+	// Snapshot Progress.Flow hiện tại (writing / reviewing / rewriting / polishing)
 	Flow string `json:"flow,omitempty"`
 }
 
-// HasDirective 判断这份章节规划是否真的说清了"该写成什么样"。
+// HasDirective xác định bản quy hoạch chương này có thực sự nói rõ "nên viết ra đằng nào" không.
 //
-// 空规划与没有规划等价：返工时只列缺陷、不给方向，Writer 拿到的仍旧只是
-// "重写第 N 章"一句话——实测 Editor 把这判为队列里最严重的一条问题。
+// Quy hoạch rỗng tương đương không có quy hoạch: khi viết lại chỉ liệt kê khuyết điểm mà không
+// cho hướng, Writer nhận được vẫn chỉ là câu "viết lại chương N" — thực đo Editor phán đây là
+// vấn đề nghiêm trọng nhất trong hàng đợi.
 func (p ChapterPlan) HasDirective() bool {
 	return strings.TrimSpace(p.Goal) != "" ||
 		len(p.Contract.RequiredBeats) > 0 ||

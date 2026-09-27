@@ -94,7 +94,7 @@ func TestReadChapterFinalDoesNotSubstituteDraft(t *testing.T) {
 		t.Fatal(err)
 	}
 	if got.Exists || got.Source != "final" || got.Content != "" {
-		t.Fatalf("请求 final 不得静默替换为 draft: %+v", got)
+		t.Fatalf("yêu cầu final không được lặng lẽ thay bằng draft: %+v", got)
 	}
 }
 
@@ -200,7 +200,7 @@ func TestDraftChapterWrite(t *testing.T) {
 		t.Fatal("expected non-zero word count")
 	}
 
-	// 验证能读回来
+	// Kiểm chứng đọc lại được
 	content, err := store.Drafts.LoadDraft(1)
 	if err != nil {
 		t.Fatalf("LoadDraft: %v", err)

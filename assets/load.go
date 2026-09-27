@@ -51,6 +51,10 @@ type Bundle struct {
 	Styles     map[string]string
 	Voice      string // Tiêu chuẩn hành văn, ráp qua 3 tầng ghi đè
 	Language   string // "vi" hoặc "zh"
+	// Style là style bundle đã nạp (references thể loại theo style này; rỗng nguồn vào được
+	// chuẩn thành "default"). Caller dùng nó phát hiện lệch style giữa bundle và config
+	// (ví dụ host mở sách theo RunMeta.Style) mà quyết định nạp lại bundle.
+	Style string
 }
 
 // LoadOptions khai báo nguồn ghi đè tầng văn phong.
@@ -82,12 +86,17 @@ func LoadWithLanguage(language, style string, opts LoadOptions) Bundle {
 	if lang != "zh" && lang != "chinese" && lang != "cn" {
 		lang = "vi"
 	}
+	style = strings.ToLower(strings.TrimSpace(style))
+	if style == "" {
+		style = "default"
+	}
 	return Bundle{
 		References: loadReferences(lang, style, opts),
 		Prompts:    loadPrompts(lang),
 		Styles:     loadStyles(lang, opts),
 		Voice:      resolveAppendable(loadVoice(lang), "voice.md", opts),
 		Language:   lang,
+		Style:      style,
 	}
 }
 

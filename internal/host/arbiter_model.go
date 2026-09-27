@@ -8,9 +8,9 @@ import (
 	"github.com/voocel/ainovel-cli/internal/llmcontract"
 )
 
-// usageTrackedModel 给模型调用接上用量追踪:token/成本必须进入预算与 usage 系统,
-// 否则预算上限对开销失明、UI 用量不准。记录身份用传入的 agentName——导入归 architect、
-// 裁定归 arbiter(UsageTracker 对未知角色按 Default 价目计费)。
+// usageTrackedModel nối theo dõi lượng dùng vào gọi model: token/chi phí phải vào ngân sách và hệ thống
+// usage, nếu không hạn mức ngân sách mù với chi tiêu, lượng dùng UI sai. Danh tính ghi sổ dùng agentName
+// truyền vào — nhập về architect, phán định về arbiter (UsageTracker tính giá role lạ theo bảng giá Default).
 type usageTrackedModel struct {
 	inner     agentcore.ChatModel
 	agentName string
@@ -28,8 +28,8 @@ func newUsageTrackedModel(inner agentcore.ChatModel, agentName string, record fu
 	return tracked
 }
 
-// capabilityUsageTrackedModel 保留底层模型的可选能力接口。包装器不能把
-// "不支持 thinking" 擦成 "能力未知"，否则上层会生成 provider 不接受的参数。
+// capabilityUsageTrackedModel giữ giao diện năng lực tùy chọn của model nền. Wrapper không được
+// xóa "không hỗ trợ thinking" thành "năng lực không rõ", nếu không tầng trên sẽ sinh tham số provider không chấp nhận.
 type capabilityUsageTrackedModel struct {
 	*usageTrackedModel
 	capabilities llm.CapabilityProvider
@@ -39,8 +39,8 @@ func (m *capabilityUsageTrackedModel) Capabilities() llm.Capabilities {
 	return m.capabilities.Capabilities()
 }
 
-// JSONSchemaOverride 透传底层模型的 config json_schema 三态声明；inner 未携带
-// 时返回 nil（"未配置"），不伪造能力。
+// JSONSchemaOverride xuyên truyền khai báo ba trạng thái config json_schema của model nền; inner không
+// mang thì trả nil ("chưa cấu hình"), không ngụy tạo năng lực.
 func (m *capabilityUsageTrackedModel) JSONSchemaOverride() *bool {
 	if o, ok := m.usageTrackedModel.inner.(interface{ JSONSchemaOverride() *bool }); ok {
 		return o.JSONSchemaOverride()
@@ -69,7 +69,7 @@ func (m *usageTrackedModel) Generate(ctx context.Context, msgs []agentcore.Messa
 }
 
 func (m *usageTrackedModel) GenerateStream(ctx context.Context, msgs []agentcore.Message, tools []agentcore.ToolSpec, opts ...agentcore.CallOption) (<-chan agentcore.StreamEvent, error) {
-	// Arbiter 只走 Generate;流式路径透传(若未来走流,usage 由消费端补记)。
+	// Arbiter chỉ đi Generate; đường streaming xuyên truyền (nếu sau này chuyển sang streaming, usage do bên tiêu thụ bù ghi).
 	return m.inner.GenerateStream(ctx, msgs, tools, opts...)
 }
 

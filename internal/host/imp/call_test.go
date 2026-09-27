@@ -12,7 +12,7 @@ import (
 	"github.com/voocel/litellm"
 )
 
-// flakyModel 前 fails 次返回可重试错误，之后按 mockModel 响应。
+// flakyModel trả lỗi có thể thử lại trong fails lần đầu, sau đó theo phản hồi của mockModel.
 type flakyModel struct {
 	mockModel
 	fails int
@@ -26,16 +26,18 @@ func (f *flakyModel) Generate(ctx context.Context, msgs []agentcore.Message, too
 	return f.mockModel.Generate(ctx, msgs, tools, opts...)
 }
 
-// fastRetryErr 可重试且退避极短（RetryAfter 命中 RetryHinter），保证测试快速。
+// fastRetryErr có thể thử lại và backoff cực ngắn (RetryAfter trúng RetryHinter), bảo đảm test nhanh.
 type fastRetryErr struct{}
 
 func (fastRetryErr) Error() string             { return "rate limited" }
 func (fastRetryErr) Retryable() bool           { return true }
 func (fastRetryErr) RetryAfter() time.Duration { return time.Millisecond }
 
-// TestCallStructuredNotifiesRetries 守护重试可见性：请求退避与校验重问都必须回显，
-// 否则指数退避可静默数分钟，用户会误以为导入卡死（截图问题：3 分钟无声后才报错）。
-// 请求退避还必须携带非零 retryAt 截止时刻——UI 倒计时依赖它；校验重问即时发生，retryAt 为零。
+// TestCallStructuredNotifiesRetries canh giữ tính thấy được của thử lại: backoff yêu cầu và hỏi
+// lại sau kiểm tra đều phải hiển thị lại, nếu không backoff luỹ thừa có thể im lặng nhiều phút,
+// người dùng tưởng nhập bị treo (vấn đề chụp màn hình: 3 phút im lặng mới báo lỗi). Backoff yêu cầu
+// còn phải mang mốc hết hạn retryAt khác 0 — đếm ngược của UI dựa vào nó; hỏi lại sau kiểm tra xảy
+// ra tức thời, retryAt bằng 0.
 func TestCallStructuredNotifiesRetries(t *testing.T) {
 	m := &flakyModel{mockModel: mockModel{responses: []string{"不是 JSON", `{"boundaries":[]}`}}, fails: 2}
 	var notes []string
@@ -45,67 +47,69 @@ func TestCallStructuredNotifiesRetries(t *testing.T) {
 		if !retryAt.IsZero() {
 			retries++
 		}
-		if strings.Contains(s, "重问") {
+		if strings.Contains(s, "hỏi lại") || strings.Contains(s, "gửi lại") {
 			reasks++
 		}
 	}}
 	if _, err := callStructured[boundaryBatch](context.Background(), m, segmentContract, "sys", "p", 100, prof, nil); err != nil {
-		t.Fatalf("最终应成功：%v", err)
+		t.Fatalf("cuối cùng phải thành công: %v", err)
 	}
 	if retries != 2 || reasks != 1 {
-		t.Fatalf("应回显 2 次带截止时刻的请求退避 + 1 次校验重问，得 %d/%d：%v", retries, reasks, notes)
+		t.Fatalf("phải hiển thị lại 2 lần backoff yêu cầu kèm mốc hết hạn + 1 lần hỏi lại sau kiểm tra, được %d/%d: %v", retries, reasks, notes)
 	}
 }
 
-// TestBriefErrIncludesAdapterFacts 守护错误回显的可诊断性：网关 message 可能只有一句
-// "Provider returned error"，回显必须补上 litellm 携带的结构化事实（分类/HTTP 状态/provider/模型），
-// 且事实在前——截断时优先保住它们；非适配器错误保持原样。
+// TestBriefErrIncludesAdapterFacts canh giữ tính chẩn đoán được của hiển thị lại lỗi: message của
+// gateway có thể chỉ có một câu "Provider returned error", hiển thị lại phải bổ các sự thật có cấu
+// trúc mà litellm mang (phân loại/trạng thái HTTP/provider/mô hình), và sự thật đặt trước — khi bị
+// cắt thì ưu tiên giữ chúng; lỗi không phải adapter giữ nguyên.
 func TestBriefErrIncludesAdapterFacts(t *testing.T) {
 	le := &litellm.LiteLLMError{
 		Type: litellm.ErrorTypeProvider, StatusCode: 502,
 		Provider: "openai", Model: "gpt-x", Message: "Provider returned error",
 	}
-	got := briefErr(fmt.Errorf("外层包装：%w", le))
-	for _, want := range []string{"上游服务错误", "HTTP 502", "openai", "gpt-x", "Provider returned error"} {
+	got := briefErr(fmt.Errorf("bao ngoài: %w", le))
+	for _, want := range []string{"lỗi dịch vụ thượng nguồn", "HTTP 502", "openai", "gpt-x", "Provider returned error"} {
 		if !strings.Contains(got, want) {
-			t.Fatalf("回显应包含 %q，得 %q", want, got)
+			t.Fatalf("hiển thị lại phải chứa %q, được %q", want, got)
 		}
 	}
-	if !strings.HasPrefix(got, "上游服务错误") {
-		t.Fatalf("结构化事实应在前，得 %q", got)
+	if !strings.HasPrefix(got, "lỗi dịch vụ thượng nguồn") {
+		t.Fatalf("sự thật có cấu trúc phải đặt trước, được %q", got)
 	}
-	if got := briefErr(errors.New("普通错误")); got != "普通错误" {
-		t.Fatalf("非适配器错误应保持原样，得 %q", got)
+	if got := briefErr(errors.New("lỗi thường")); got != "lỗi thường" {
+		t.Fatalf("lỗi không phải adapter phải giữ nguyên, được %q", got)
 	}
 }
 
-// TestCallStructuredCancelIsNotSemanticFailure 守护取消语义：用户取消（Esc）不是语义失败，
-// 不得包装成「N 次尝试」的 errSemantic——那会误导排查方向并多落一份误导性 failures/ 工件。
+// TestCallStructuredCancelIsNotSemanticFailure canh giữ ngữ nghĩa hủy: người dùng hủy (Esc) không
+// phải thất bại ngữ nghĩa, không được bọc thành errSemantic kiểu "N lần thử" — điều đó sẽ làm lệch
+// hướng điều tra và ghi thêm một artifact failures/ gây hiểu lầm.
 func TestCallStructuredCancelIsNotSemanticFailure(t *testing.T) {
 	ctx, cancel := context.WithCancel(context.Background())
 	cancel()
 	m := &mockModel{responses: []string{"垃圾输出"}}
 	_, err := callStructured[boundaryBatch](ctx, m, segmentContract, "sys", "p", 100, callProfile{}, nil)
 	if !errors.Is(err, context.Canceled) {
-		t.Fatalf("应返回 context.Canceled，得 %v", err)
+		t.Fatalf("phải trả context.Canceled, được %v", err)
 	}
 	var se *errSemantic
 	if errors.As(err, &se) {
-		t.Fatal("取消不应被包装成语义失败")
+		t.Fatal("hủy không được bọc thành thất bại ngữ nghĩa")
 	}
 }
 
-// TestCallStructuredCarriesRawOnSemanticFailure 守护 §14.2：输出层契约违约时，
-// 错误必须携带原始响应，供 runner 统一落 failures/ 失败工件。
+// TestCallStructuredCarriesRawOnSemanticFailure canh giữ §14.2: khi vi phạm hợp đồng tầng đầu
+// ra, lỗi phải mang phản hồi gốc, để runner tập trung ghi vào artifact thất bại failures/.
 func TestCallStructuredCarriesRawOnSemanticFailure(t *testing.T) {
 	m := &nativeImportModel{mockModel: &mockModel{responses: []string{"垃圾输出 not json"}}}
 	_, err := callStructured[boundaryBatch](context.Background(), m, segmentContract, "sys", "payload", 100, callProfile{}, nil)
 	var se *errSemantic
 	if !errors.As(err, &se) {
-		t.Fatalf("应返回 errSemantic，得 %T：%v", err, err)
+		t.Fatalf("phải trả errSemantic, được %T: %v", err, err)
 	}
-	if se.Raw != "垃圾输出 not json" || !strings.Contains(se.Error(), "契约违约") {
-		t.Fatalf("Raw 应携带最后一次原始响应，得 %q", se.Raw)
+	if se.Raw != "垃圾输出 not json" || !strings.Contains(se.Error(), "vi phạm hợp đồng schema gốc") {
+		t.Fatalf("Raw phải mang phản hồi gốc lần cuối, được %q", se.Raw)
 	}
 }
 
@@ -117,6 +121,6 @@ func TestCallStructuredCarriesRawOnProtocolFailure(t *testing.T) {
 	_, err := callStructured[boundaryBatch](context.Background(), m, segmentContract, "sys", "payload", 100, callProfile{}, nil)
 	var se *errSemantic
 	if !errors.As(err, &se) || se.Raw != "upstream malformed output" || !strings.Contains(se.Error(), "stop_reason=error") {
-		t.Fatalf("协议错误应携带原始响应，得 %T：%v", err, err)
+		t.Fatalf("lỗi giao thức phải mang phản hồi gốc, được %T: %v", err, err)
 	}
 }

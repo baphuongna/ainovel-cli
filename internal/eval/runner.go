@@ -14,28 +14,29 @@ import (
 	"github.com/voocel/ainovel-cli/internal/host"
 )
 
-// RunOptions 控制单次 case 运行。
+// RunOptions điều khiển một lần chạy case.
 type RunOptions struct {
-	OutputDir string        // 隔离输出目录（必填）
-	Timeout   time.Duration // 单 case 墙钟上限；0 表示不限
-	Progress  io.Writer     // 进度行输出（可选，nil 则不打印）
+	OutputDir string        // thư mục xuất cách ly (bắt buộc)
+	Timeout   time.Duration // giới hạn wall-clock cho một case; 0 nghĩa là không giới hạn
+	Progress  io.Writer     // xuất dòng tiến độ (tuỳ chọn, nil thì không in)
 }
 
-// RunCase 驱动一次 case：装配 host → 启动 → 按章数上限推进 → 到点 Abort。
-// bundle 由调用方做过 variant 覆盖（如有）。返回的 error 即"运行时错误"（hard fail 依据）；
-// 正常写完或正常截停都返回 nil。
+// RunCase điều khiển một lần chạy case: lắp host → khởi động → tiến tới giới hạn số chương →
+// Abort đúng lúc. bundle đã được bên gọi ghi đè variant (nếu có). error trả về chính là "lỗi
+// runtime" (căn cứ hard fail); viết xong bình thường hay dừng do chạm giới hạn đều trả nil.
 //
-// RunCase 独占并重置 OutputDir：StartPrepared 只重置 progress/checkpoints，不清 chapters/
-// foundation 等工件，复用旧目录会让残留产物污染 diag 与 novel_context。故运行前清空，保证隔离。
+// RunCase độc chiếm và đặt lại OutputDir: StartPrepared chỉ đặt lại progress/checkpoints, không
+// dọn chapters/foundation v.v., tái dùng thư mục cũ sẽ để sản phẩm sót làm bẩn diag và
+// novel_context. Vì thế xoá sạch trước khi chạy, bảo đảm cách ly.
 func RunCase(cfg bootstrap.Config, bundle assets.Bundle, c Case, opts RunOptions) error {
 	if strings.TrimSpace(opts.OutputDir) == "" {
-		return fmt.Errorf("RunCase: 缺少 OutputDir")
+		return fmt.Errorf("RunCase: thiếu OutputDir")
 	}
 	if err := os.RemoveAll(opts.OutputDir); err != nil {
-		return fmt.Errorf("清理输出目录: %w", err)
+		return fmt.Errorf("dọn thư mục xuất: %w", err)
 	}
 	if err := os.MkdirAll(opts.OutputDir, 0o755); err != nil {
-		return fmt.Errorf("创建输出目录: %w", err)
+		return fmt.Errorf("tạo thư mục xuất: %w", err)
 	}
 	cfg.OutputDir = opts.OutputDir
 	if c.Style != "" {
@@ -44,11 +45,11 @@ func RunCase(cfg bootstrap.Config, bundle assets.Bundle, c Case, opts RunOptions
 
 	eng, err := host.New(cfg, bundle, host.WithFileLog("headless.log", false))
 	if err != nil {
-		return fmt.Errorf("装配 host: %w", err)
+		return fmt.Errorf("lắp host: %w", err)
 	}
 	defer eng.Close()
 	if logErr := eng.FileLogError(); logErr != nil {
-		return fmt.Errorf("评测文件日志不可用: %w", logErr)
+		return fmt.Errorf("file log đánh giá không dùng được: %w", logErr)
 	}
 
 	prompt, err := startup.PrepareQuick(c.Prompt)
@@ -56,17 +57,18 @@ func RunCase(cfg bootstrap.Config, bundle assets.Bundle, c Case, opts RunOptions
 		return err
 	}
 	if err := eng.PrepareUserRules(prompt); err != nil {
-		return fmt.Errorf("准备用户规则: %w", err)
+		return fmt.Errorf("chuẩn bị quy tắc người dùng: %w", err)
 	}
 	if err := eng.StartPrepared(prompt); err != nil {
-		return fmt.Errorf("启动: %w", err)
+		return fmt.Errorf("khởi động: %w", err)
 	}
 
 	return drive(eng, c.MaxChapters, opts)
 }
 
-// driveEngine 是 drive 消费的最小引擎接口（*host.Host 天然满足）。抽出来是为了给
-// drain-to-Done 纪律写确定性测试——这段并发逻辑出过 send-on-closed-channel 的坑。
+// driveEngine là giao diện engine tối thiểu mà drive tiêu thụ (*host.Host vốn thoả mãn).
+// Tách ra để viết test xác định cho kỷ luật drain-to-Done — đoạn logic đồng thời này từng dính
+// bẫy send-on-closed-channel.
 type driveEngine interface {
 	Events() <-chan host.Event
 	Stream() <-chan string
@@ -75,12 +77,15 @@ type driveEngine interface {
 	Abort() bool
 }
 
-// drive 消费引擎事件流，到章数上限或超时即 Abort，等 Done 收场。
+// drive tiêu thụ dòng sự kiện của engine, chạm giới hạn số chương hoặc quá thời hạn là Abort,
+// chờ Done mới kết thúc.
 //
-// 关键纪律：无论正常完成、章数截停还是超时，都必须 drain 到 Done 才返回。host 后台 waitDone
-// 会向 done 发送一次，而 eng.Close()（RunCase 的 defer）会 close(done)——提前返回触发 Close
-// 会与 waitDone 的发送竞争关闭通道而 panic（send on closed channel）。headless 同样靠"先 Done
-// 后 Close"。同时必须排空 Events 与 Stream，避免阻塞引擎。
+// Kỷ luật then chốt: dù hoàn thành bình thường, dừng do chạm giới hạn số chương hay quá thời
+// hạn, đều phải drain tới Done rồi mới trả về. waitDone chạy nền của host sẽ gửi vào done đúng
+// một lần, còn eng.Close() (defer của RunCase) sẽ close(done) — trả về sớm làm Close kích hoạt
+// sớm sẽ đua với lần gửi của waitDone trên kênh đang đóng mà panic (send on closed channel).
+// headless cũng dựa vào "Done trước, Close sau". Đồng thời phải cạn Events và Stream, tránh
+// chặn engine.
 func drive(eng driveEngine, maxChapters int, opts RunOptions) error {
 	var timeoutCh <-chan time.Time
 	if opts.Timeout > 0 {
@@ -90,10 +95,11 @@ func drive(eng driveEngine, maxChapters int, opts RunOptions) error {
 	}
 
 	aborted, timedOut := false, false
-	// finish 在 drain 到 Done（或通道关闭）后调用：超时则返回 error，否则正常结束。
+	// finish được gọi sau khi drain tới Done (hoặc kênh bị đóng): quá thời hạn thì trả error,
+	// không thì kết thúc bình thường.
 	finish := func() error {
 		if timedOut {
-			return fmt.Errorf("运行超时（%s）", opts.Timeout)
+			return fmt.Errorf("chạy vượt thời hạn (%s)", opts.Timeout)
 		}
 		return nil
 	}
@@ -109,25 +115,26 @@ func drive(eng driveEngine, maxChapters int, opts RunOptions) error {
 			if !aborted && capReached(eng.Snapshot(), maxChapters) {
 				eng.Abort()
 				aborted = true
-				timeoutCh = nil // 已达截停条件，转入正常收尾，不再受超时约束（避免把成功截停误判为超时）
+				timeoutCh = nil // đã đạt điều kiện dừng, chuyển sang kết thúc bình thường, không còn bị ràng buộc thời hạn (tránh nhầm dừng thành công là quá thời hạn)
 			}
 		case <-eng.Stream():
-			// 排空流式增量，不消费内容——eval 不关心正文流，只看落盘事实。
+			// cạn phần tăng luồng streaming, không tiêu thụ nội dung — eval không quan tâm dòng
+			// chính văn, chỉ nhìn sự thật ghi đĩa.
 		case _, ok := <-eng.Done():
 			if !ok {
 				return finish()
 			}
 			return finish()
 		case <-timeoutCh:
-			eng.Abort() // 此处 aborted 必为 false（cap 截停会把 timeoutCh 置 nil）
+			eng.Abort() // aborted ở đây chắc chắn là false (dừng do cap sẽ đặt timeoutCh thành nil)
 			aborted, timedOut = true, true
-			timeoutCh = nil // 禁用计时器，继续 drain 直至 Done，再由 finish 返回超时错误
+			timeoutCh = nil // vô hiệu hoá bộ đếm thời gian, tiếp tục drain tới Done, rồi finish trả lỗi quá thời hạn
 		}
 	}
 }
 
-// capReached 判断是否达到截停条件。maxChapters>0 按已完成章数；<=0 视为"规划类"，
-// 规划完成（进入 writing 或已 complete）即停。
+// capReached phán đoán đã đạt điều kiện dừng chưa. maxChapters>0 tính theo số chương hoàn
+// thành; <=0 coi là "loại hoạch định", hoạch định xong (vào writing hoặc đã complete) là dừng.
 func capReached(snap host.UISnapshot, maxChapters int) bool {
 	if maxChapters <= 0 {
 		return snap.Phase == string(domain.PhaseWriting) || snap.Phase == string(domain.PhaseComplete)

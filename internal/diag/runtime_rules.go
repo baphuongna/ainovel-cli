@@ -7,15 +7,15 @@ import (
 	"github.com/voocel/ainovel-cli/internal/store"
 )
 
-// 运行时检测阈值。
+// Ngưỡng phát hiện runtime.
 const (
-	repeatCritical = 8 // 近端重复达到此次数升为 critical
-	streamIdleWarn = 3 // stream_idle 累计告警阈值
+	repeatCritical = 8 // lặp gần cuối đạt chừng này lần thì nâng lên critical
+	streamIdleWarn = 3 // ngưỡng cảnh báo cộng dồn stream_idle
 )
 
-// RuntimeRuleFunc 是运行时诊断规则的统一签名（对应创作侧的 RuleFunc）。
-// 入参是脱敏聚合后的 RuntimeCapture，产出报告型 Finding——全部 AutoNone，
-// 只诊断、不产 Action（观察者纪律，见 architecture.md §2.3）。
+// RuntimeRuleFunc là chữ ký thống nhất của quy tắc chẩn đoán runtime (tương ứng RuleFunc phía sáng tác).
+// Tham số vào là RuntimeCapture sau khi làm mờ và gộp, sinh Finding dạng báo cáo — tất cả AutoNone,
+// chỉ chẩn đoán, không sinh Action (kỷ luật người quan sát, xem architecture.md §2.3).
 type RuntimeRuleFunc func(rc *RuntimeCapture) []Finding
 
 var runtimeRules = []RuntimeRuleFunc{
@@ -24,7 +24,7 @@ var runtimeRules = []RuntimeRuleFunc{
 	streamIdleStorm,
 }
 
-// runtimeFindings 跑全部运行时规则。
+// runtimeFindings chạy toàn bộ quy tắc runtime.
 func runtimeFindings(rc *RuntimeCapture) []Finding {
 	var out []Finding
 	for _, rule := range runtimeRules {
@@ -33,9 +33,9 @@ func runtimeFindings(rc *RuntimeCapture) []Finding {
 	return out
 }
 
-// Diagnose 是 /diag 的完整诊断入口：创作诊断 + 运行时信号 + 运行时检测，
-// 返回合并后的 Report 与原始 RuntimeCapture（供导出复用，避免重复抓取）。
-// 运行时 Finding 仅并入 Findings 供展示，不改 Actions——保持纯观察。
+// Diagnose là cổng vào chẩn đoán đầy đủ của /diag: chẩn đoán sáng tác + tín hiệu runtime + phát hiện runtime,
+// trả về Report sau khi gộp và RuntimeCapture thô (để xuất tái sử dụng, tránh chụp lại).
+// Finding runtime chỉ được gộp vào Findings để hiển thị, không đổi Actions — giữ thuần quan sát.
 func Diagnose(s *store.Store) (Report, RuntimeCapture) {
 	rep := Analyze(s)
 	rc := CaptureRuntime(s)
@@ -44,9 +44,10 @@ func Diagnose(s *store.Store) (Report, RuntimeCapture) {
 	return rep, rc
 }
 
-// repeatedErrors 只把"近端反复出现的错误 / 参数无效"判成 Finding。
-// 不碰普通工具重复——subagent/novel_context/read_chapter 等在长跑里天然
-// 高频，累计次数不是循环信号；真正的"反复而不推进"由 stuckStep 兜住。
+// repeatedErrors chỉ phán "lỗi / tham số vô hiệu xuất hiện lặp lại gần cuối" thành Finding.
+// Không đụng tới lặp công cụ bình thường — subagent/novel_context/read_chapter v.v. vốn
+// tần suất cao một cách tự nhiên khi chạy dài, số lần cộng dồn không phải tín hiệu vòng lặp;
+// "lặp mà không tiến" thật sự do stuckStep lo phần chốt.
 func repeatedErrors(rc *RuntimeCapture) []Finding {
 	var out []Finding
 	for _, r := range rc.Repeats {
@@ -54,14 +55,14 @@ func repeatedErrors(rc *RuntimeCapture) []Finding {
 		switch {
 		case strings.Contains(r.Sig, " · err: "):
 			rule = "RepeatedToolError"
-			title = "工具反复报同一错误"
-			sugg = "近端同一工具反复返回同一错误，多为模型参数不合规或工具契约不符；查 agentcore 工具校验 / prompt 参数约定（参见 #34）。"
+			title = "Công cụ lặp đi lặp lại báo cùng một lỗi"
+			sugg = "Gần cuối cùng một công cụ lặp đi lặp lại trả về cùng một lỗi, phần nhiều do tham số mô hình không hợp lệ hoặc không khớp hợp đồng công cụ; kiểm tra kiểm tra công cụ của agentcore / quy ước tham số prompt (xem #34)."
 		case strings.Contains(r.Sig, "(args invalid)"):
 			rule = "ArgsInvalidLoop"
-			title = "参数反复无法解析"
-			sugg = "模型发来的参数无法解析却不断重试；看 agentcore 是否对该类型做了宽松强转（参见 #34）。"
+			title = "Tham số lặp lại không thể phân tích"
+			sugg = "Tham số mô hình gửi tới không thể phân tích mà cứ thử lại liên tục; xem agentcore có ép chuyển kiểu lỏng lẻo cho kiểu này hay không (xem #34)."
 		default:
-			continue // 普通工具重复不产 Finding
+			continue // lặp công cụ bình thường không sinh Finding
 		}
 		sev := SevWarning
 		if r.Count >= repeatCritical {
@@ -82,7 +83,7 @@ func repeatedErrors(rc *RuntimeCapture) []Finding {
 	return out
 }
 
-// stuckStep 检测 checkpoint 连续停在同一 step。
+// stuckStep phát hiện checkpoint dừng liên tiếp ở cùng một step.
 func stuckStep(rc *RuntimeCapture) []Finding {
 	if rc.StuckStep == "" {
 		return nil
@@ -98,13 +99,13 @@ func stuckStep(rc *RuntimeCapture) []Finding {
 		Confidence: ConfHigh,
 		AutoLevel:  AutoNone,
 		Target:     "runtime.flow",
-		Title:      "checkpoint 停滞在同一 step",
-		Evidence:   fmt.Sprintf("连续停在 `%s` ×%d", rc.StuckStep, rc.StuckCount),
-		Suggestion: "同一 step 反复写入而不推进；结合上面的重复签名定位是哪个子代理卡住。",
+		Title:      "checkpoint đình trệ ở cùng một step",
+		Evidence:   fmt.Sprintf("dừng liên tiếp ở `%s` ×%d", rc.StuckStep, rc.StuckCount),
+		Suggestion: "Cùng một step được ghi lặp đi lặp lại mà không tiến; kết hợp chữ ký trùng lặp phía trên để định vị subagent nào bị kẹt.",
 	}}
 }
 
-// streamIdleStorm 检测流式中断频发（#32）。
+// streamIdleStorm phát hiện gián đoạn streaming dày đặc (#32).
 func streamIdleStorm(rc *RuntimeCapture) []Finding {
 	n := rc.LogKinds["stream_idle"]
 	if n < streamIdleWarn {
@@ -117,8 +118,8 @@ func streamIdleStorm(rc *RuntimeCapture) []Finding {
 		Confidence: ConfHigh,
 		AutoLevel:  AutoNone,
 		Target:     "runtime.provider",
-		Title:      "流式中断频发（stream_idle）",
+		Title:      "Gián đoạn streaming dày đặc (stream_idle)",
 		Evidence:   fmt.Sprintf("stream_idle ×%d", n),
-		Suggestion: "上游长时间不吐 token 被 watchdog 误杀；慢思考模型调大 streamIdleTimeout，或排查 provider 连接稳定性（参见 #32）。",
+		Suggestion: "Thượng nguồn lâu không nhả token nên bị watchdog giết nhầm; với mô hình suy nghĩ chậm hãy tăng streamIdleTimeout, hoặc rà độ ổn định kết nối provider (xem #32).",
 	}}
 }

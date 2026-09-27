@@ -40,6 +40,17 @@ func TestLoad_NoOverrides(t *testing.T) {
 	if _, ok := b.Styles["default"]; !ok {
 		t.Fatal("Bộ styles mặc định phải chứa default")
 	}
+	// Hợp đồng Bundle.Style (T4): bundle phải ghi nhớ style đã nạp để caller phát hiện lệch
+	// style giữa bundle và config mà nạp lại; style rỗng chuẩn thành "default".
+	if b.Style != "default" {
+		t.Fatalf("Bundle.Style = %q, want default", b.Style)
+	}
+	if w := LoadWithLanguage("vi", "wuxia", LoadOptions{}); w.Style != "wuxia" {
+		t.Fatalf("Bundle.Style sau khi nạp wuxia = %q, want wuxia", w.Style)
+	}
+	if e := Load("", LoadOptions{}); e.Style != "default" {
+		t.Fatalf("Bundle.Style với style rỗng = %q, want default", e.Style)
+	}
 }
 
 func TestInterventionPromptsKeepScopeContract(t *testing.T) {
@@ -68,6 +79,32 @@ func TestStructuredArbiterPromptsContainOnlySemantics(t *testing.T) {
 			if strings.Contains(prompt, duplicate) {
 				t.Fatalf("%s prompt còn lặp lại định dạng output: %q", name, duplicate)
 			}
+		}
+	}
+}
+
+// TestLoad_ZHStyleWuxia (T7) zh + wuxia trước đây không nạp được style nào vì thiếu
+// assets/styles/zh/wuxia.md. Hợp đồng: bundle zh phải có sẵn style wuxia với các
+// chỉ thị cốt lõi (thể loại, cổ phong bạch thoại, cấm hiện đại, chỉ dẫn cụ thể).
+func TestLoad_ZHStyleWuxia(t *testing.T) {
+	b := LoadWithLanguage("zh", "wuxia", LoadOptions{})
+	if b.Language != "zh" || b.Style != "wuxia" {
+		t.Fatalf("bundle phải là zh/wuxia, nhận được %q/%q", b.Language, b.Style)
+	}
+	got, ok := b.Styles["wuxia"]
+	if !ok {
+		t.Fatal("Bộ styles zh phải chứa wuxia (assets/styles/zh/wuxia.md)")
+	}
+	for _, phrase := range []string{
+		"武侠/仙侠",    // mô tả thể loại
+		"古风白话",     // ngôn ngữ cổ phong
+		"不许混入现代词汇", // cấm yếu tố hiện đại
+		"杀伐果断",     // chỉ dẫn viết cụ thể
+		"无敌流",
+		"专名不可侵犯",
+	} {
+		if !strings.Contains(got, phrase) {
+			t.Fatalf("Style zh wuxia thiếu chỉ thị bắt buộc: %q", phrase)
 		}
 	}
 }

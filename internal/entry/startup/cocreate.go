@@ -7,7 +7,7 @@ import (
 	"github.com/voocel/ainovel-cli/internal/host"
 )
 
-// CoCreateSession 承载共创模式的非 UI 状态。
+// CoCreateSession chứa trạng thái phi UI của chế độ đồng sáng tạo.
 type CoCreateSession struct {
 	history        []host.CoCreateMessage
 	draftPrompt    string
@@ -38,10 +38,11 @@ func (s *CoCreateSession) ApplyReply(reply host.CoCreateReply) {
 	}
 	s.streamReply = ""
 	s.streamThinking = ""
-	// history 里 assistant 存完整三段 Raw（含 [DRAFT]），下一轮模型才能看到
-	// 自己上一轮写的草稿、在它基础上累积更新；只存 Message 会让 [DRAFT] 完全
-	// 不进上下文，模型每轮只能凭对话重新归纳，早期细节容易丢。降级路径下
-	// Raw == Message，等价。
+	// Trong history, assistant lưu đủ ba đoạn Raw (gồm [DRAFT]), vòng sau mô hình mới
+	// thấy được bản nháp mình viết vòng trước và tích lũy cập nhật trên đó; chỉ lưu
+	// Message thì [DRAFT] hoàn toàn không vào ngữ cảnh, mỗi vòng mô hình chỉ đúc kết
+	// lại từ hội thoại, chi tiết giai đoạn sớm dễ mất. Trên đường hạ cấp, Raw == Message,
+	// tương đương.
 	text := strings.TrimSpace(reply.Raw)
 	if text == "" {
 		text = strings.TrimSpace(reply.Message)
@@ -49,13 +50,15 @@ func (s *CoCreateSession) ApplyReply(reply host.CoCreateReply) {
 	if text != "" {
 		s.history = append(s.history, host.CoCreateMessage{Role: "assistant", Content: text})
 	}
-	// 仅当 Prompt 非空才覆盖 draft：parse 降级路径会返回 Prompt=""，此时
-	// 必须保留上一轮 draft，否则用户已积累的"当前创作指令"会被截断的回复清空。
+	// Chỉ khi Prompt khác rỗng mới ghi đè draft: đường hạ cấp của parse trả về Prompt="",
+	// lúc đó phải giữ draft vòng trước, nếu không "chỉ thị sáng tác hiện tại" người dùng
+	// đã tích lũy sẽ bị câu trả lời bị cắt cụt xóa sạch.
 	if prompt := strings.TrimSpace(reply.Prompt); prompt != "" {
 		s.draftPrompt = prompt
 	}
 	s.ready = reply.Ready
-	// suggestions 直接覆盖（包括覆盖为空）：每轮的引导只对当下有意义。
+	// suggestions ghi đè trực tiếp (kể cả ghi đè bằng rỗng): lời gợi ý mỗi vòng chỉ có
+	// ý nghĩa với thời điểm đó.
 	s.suggestions = append(s.suggestions[:0], reply.Suggestions...)
 }
 
@@ -67,14 +70,15 @@ func (s *CoCreateSession) AppendUser(text string) {
 	if text == "" {
 		return
 	}
-	// 用户已经决定下一句要说什么，suggestions 立即作废，避免 AI 还没回复时
-	// 旧建议挂在输入框上误导。
+	// Người dùng đã quyết định câu tiếp theo nói gì, suggestions lập tức vô hiệu, tránh
+	// khi AI chưa trả lời thì gợi ý cũ còn treo trên ô nhập gây hiểu lầm.
 	s.suggestions = nil
 	s.history = append(s.history, host.CoCreateMessage{Role: "user", Content: text})
 }
 
-// ApplyDelta 接收流式累积；kind="thinking" 写入推理流，"reply" 写入回复预览。
-// 两路分别累积，UI 可分块染色显示，让用户在 thinking 阶段也看到 LLM 在工作。
+// ApplyDelta tiếp nhận tích lũy luồng; kind="thinking" ghi vào luồng suy luận,
+// "reply" ghi vào bản xem trước trả lời. Hai luồng tích lũy riêng, UI có thể tô màu
+// theo khối, để người dùng ngay trong giai đoạn thinking cũng thấy LLM đang làm việc.
 func (s *CoCreateSession) ApplyDelta(kind, text string) {
 	if s == nil {
 		return

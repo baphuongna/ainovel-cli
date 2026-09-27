@@ -14,13 +14,13 @@ func TestSummaryTitleCacheTracksSave(t *testing.T) {
 		t.Fatal(err)
 	}
 	if title, err := st.Summaries.LoadSummaryTitle(1); err != nil || title != "旧标题" {
-		t.Fatalf("首次读取标题: title=%q err=%v", title, err)
+		t.Fatalf("đọc tiêu đề lần đầu: title=%q err=%v", title, err)
 	}
 	if err := st.Summaries.SaveSummary(domain.ChapterSummary{Chapter: 1, Title: "新标题"}); err != nil {
 		t.Fatal(err)
 	}
 	if title, err := st.Summaries.LoadSummaryTitle(1); err != nil || title != "新标题" {
-		t.Fatalf("保存后缓存未更新: title=%q err=%v", title, err)
+		t.Fatalf("cache chưa cập nhật sau khi lưu: title=%q err=%v", title, err)
 	}
 }
 
@@ -30,13 +30,13 @@ func TestProjectFormatDefaultsToLegacyAndPersistsUpgrade(t *testing.T) {
 		t.Fatal(err)
 	}
 	if version, err := st.LoadProjectFormatVersion(); err != nil || version != LegacyProjectFormatVersion {
-		t.Fatalf("无版本文件应识别为旧格式: version=%d err=%v", version, err)
+		t.Fatalf("không có tệp phiên bản phải nhận là định dạng cũ: version=%d err=%v", version, err)
 	}
 	if err := st.SaveProjectFormatVersion(CurrentProjectFormatVersion); err != nil {
 		t.Fatal(err)
 	}
 	if version, err := st.LoadProjectFormatVersion(); err != nil || version != CurrentProjectFormatVersion {
-		t.Fatalf("格式版本未持久化: version=%d err=%v", version, err)
+		t.Fatalf("phiên bản định dạng chưa được lưu bền: version=%d err=%v", version, err)
 	}
 }
 
@@ -50,7 +50,7 @@ func TestFoundationMissingReturnsReadError(t *testing.T) {
 		t.Fatal(err)
 	}
 	if _, err := st.FoundationMissing(); err == nil {
-		t.Fatal("损坏的大纲必须返回读取错误，不能降级成缺失项")
+		t.Fatal("dàn ý hỏng phải trả về lỗi đọc, không được hạ cấp thành mục thiếu")
 	}
 }
 

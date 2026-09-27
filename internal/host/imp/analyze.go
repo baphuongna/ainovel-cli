@@ -14,11 +14,12 @@ import (
 	"github.com/voocel/ainovel-cli/internal/domain"
 )
 
-// analysisSchemaVersion 是逐章事实 schema 版本，纳入 InputDigest。
+// analysisSchemaVersion là phiên bản schema sự thực từng chương, đưa vào InputDigest.
 const analysisSchemaVersion = 2
 
-// ImportedCharacterFact / ImportedWorldFact 是用于全书综合的紧凑观察，不直接写正式角色或世界规则。
-// 至少携带章节号，使综合结果有稳定来源（RFC §9.1）。
+// ImportedCharacterFact / ImportedWorldFact là quan sát cô đọng dùng cho tổng hợp toàn sách,
+// không ghi trực tiếp thành nhân vật hay quy tắc thế giới chính thức. Ít nhất mang số chương,
+// để kết quả tổng hợp có nguồn gốc ổn định (RFC §9.1).
 type ImportedCharacterFact struct {
 	Chapter int    `json:"chapter"`
 	Name    string `json:"name"`
@@ -31,7 +32,7 @@ type ImportedWorldFact struct {
 	Fact     string `json:"fact"`
 }
 
-// ImportedChapterFacts 是单章反推的结构化产物（RFC §9.1）。
+// ImportedChapterFacts là sản phẩm có cấu trúc suy ngược từ một chương (RFC §9.1).
 type ImportedChapterFacts struct {
 	Chapter             int                        `json:"chapter"`
 	Title               string                     `json:"title"`
@@ -51,33 +52,35 @@ type ImportedChapterFacts struct {
 	DominantStrand      string                     `json:"dominant_strand"`
 }
 
-// AnalysisBatchResult 是一次批次调用的结构化返回，每元素是一章事实。
+// AnalysisBatchResult là kết quả có cấu trúc của một lần gọi lô, mỗi phần tử là sự thực một chương.
 type AnalysisBatchResult struct {
 	Chapters []ImportedChapterFacts `json:"chapters"`
 }
 
-// ChapterAnalysisPayload 是单章分析工件载荷；同批次章节记录相同 BatchStart/BatchEnd。
+// ChapterAnalysisPayload là payload artifact phân tích một chương; các chương cùng lô ghi cùng BatchStart/BatchEnd.
 type ChapterAnalysisPayload struct {
 	BatchStart int                  `json:"batch_start"`
 	BatchEnd   int                  `json:"batch_end"`
 	Facts      ImportedChapterFacts `json:"facts"`
 }
 
-// AnalyzeBudget 是逐章分析的输入/输出双预算（RFC §9.2）。
-// 输入以字节近似 context window；输出以每章保守事实预留近似 completion 上限。
+// AnalyzeBudget là ngân sách kép đầu vào/đầu ra của phân tích từng chương (RFC §9.2).
+// Đầu vào xấp xỉ context window bằng byte; đầu ra xấp xỉ trần completion bằng dự phòng sự thực bảo thủ mỗi chương.
 type AnalyzeBudget struct {
-	ContextBytes     int // 输入预算（正文 + ledger + overhead）
-	MaxOutputTokens  int // 可见输出预算（completion 上限）
-	PerChapterOutput int // 每章保守输出预留
-	PromptOverhead   int // system/ledger 固定输入开销（字节）
+	ContextBytes     int // ngân sách đầu vào (chính văn + ledger + overhead)
+	MaxOutputTokens  int // ngân sách đầu ra khả kiến (trần completion)
+	PerChapterOutput int // dự phòng bảo thủ mỗi chương
+	PromptOverhead   int // overhead đầu vào cố định của system/ledger (byte)
 }
 
 func analysisPath(chapter int) string {
 	return fmt.Sprintf("%s/%06d.json", dirAnalyses, chapter)
 }
 
-// analyzedChapters 返回从第 1 章起连续、且 InputDigest 与当前切分身份/版本/正文匹配的分析工件数（RFC §9.6）。
-// 缺失、解析失败或 digest 失配都在此截断，使上游变化（重切、改 prompt/schema 版本）自然失效下游分析。
+// analyzedChapters trả về số artifact phân tích liên tục từ chương 1 mà InputDigest khớp với
+// danh tính phân tách / phiên bản / chính văn hiện tại (RFC §9.6). Thiếu, lỗi phân tích hay digest
+// mất khớp đều cắt ngang ở đây, khiến thay đổi thượng nguồn (phân tách lại, đổi phiên bản prompt/schema)
+// tự nhiên vô hiệu phân tích hạ nguồn.
 func analyzedChapters(w *Workspace, seg *Segmentation, normalized []byte, segIdentity, promptVersion string) int {
 	n := 0
 	for c := 1; c <= len(seg.Chapters); c++ {
@@ -93,8 +96,9 @@ func analyzedChapters(w *Workspace, seg *Segmentation, normalized []byte, segIde
 	return n
 }
 
-// analyzedChaptersStrict 与 analyzedChapters 的新鲜度语义一致，但会暴露损坏或不可读
-// 的既有工件。状态恢复使用严格版本，避免把真实读取错误当成“尚未分析”后覆盖重做。
+// analyzedChaptersStrict cùng ngữ nghĩa tươi mới với analyzedChapters, nhưng phơi bày artifact
+// sẵn có bị hỏng hoặc không đọc được. Khôi phục trạng thái dùng bản strict, tránh coi lỗi đọc thật
+// là "chưa phân tích" rồi ghi đè làm lại.
 func analyzedChaptersStrict(w *Workspace, seg *Segmentation, normalized []byte, segIdentity, promptVersion string) (int, error) {
 	n := 0
 	for c := 1; c <= len(seg.Chapters); c++ {
@@ -103,7 +107,7 @@ func analyzedChaptersStrict(w *Workspace, seg *Segmentation, normalized []byte, 
 			break
 		}
 		if err != nil {
-			return n, fmt.Errorf("读取第 %d 章分析工件: %w", c, err)
+			return n, fmt.Errorf("đọc artifact phân tích chương %d: %w", c, err)
 		}
 		if a.InputDigest != chapterInputDigest(segIdentity, promptVersion, seg, normalized, c-1) {
 			break
@@ -113,20 +117,22 @@ func analyzedChaptersStrict(w *Workspace, seg *Segmentation, normalized []byte, 
 	return n, nil
 }
 
-// discardAnalysesAfter 删除章号 > keep 的逐章分析工件，使"重分析某章即失效其后全部分析"成立（#4a）。
-// 正常前向分析时 keep 之后本就无工件，为幂等无操作；仅在中途重分析（越过新鲜前缀）时清理陈旧尾部。
-// 删除失败必须传播：这是该不变量的唯一执行点，吞掉错误会让陈旧尾部（逐章 digest 恒匹配）
-// 被当作新鲜前缀复用，综合将消费新旧混拼的事实且无任何报错。
+// discardAnalysesAfter xóa artifact phân tích từng chương có số chương > keep, để "phân tích lại
+// chương nào thì vô hiệu toàn bộ phân tích phía sau" thành lập (#4a). Khi phân tích tiến thuận
+// bình thường thì sau keep vốn không còn artifact, là no-op idempotent; chỉ dọn đuôi cũ khi phân
+// tích lại giữa chừng (vượt qua tiền tố tươi). Lỗi xóa phải lan truyền: đây là điểm thi hành duy
+// nhất của bất biến đó, nuốt lỗi sẽ khiến đuôi cũ (digest từng chương luôn khớp) bị coi là tiền
+// tố tươi mà tái sử dụng, tổng hợp sẽ tiêu thụ sự thực trộn mới cũ mà không báo lỗi gì.
 func discardAnalysesAfter(w *Workspace, keep, total int) error {
 	for c := keep + 1; c <= total; c++ {
 		if err := os.Remove(w.path(analysisPath(c))); err != nil && !os.IsNotExist(err) {
-			return fmt.Errorf("清理陈旧分析工件 %s：%w", analysisPath(c), err)
+			return fmt.Errorf("dọn artifact phân tích cũ %s: %w", analysisPath(c), err)
 		}
 	}
 	return nil
 }
 
-// loadPriorFacts 读取 1..count 章已落盘的事实，供 ledger 构造。
+// loadPriorFacts đọc sự thực đã ghi của chương 1..count, để dựng ledger.
 func loadPriorFacts(w *Workspace, count int) []ImportedChapterFacts {
 	var out []ImportedChapterFacts
 	for c := 1; c <= count; c++ {
@@ -144,14 +150,15 @@ func loadPriorFactsStrict(w *Workspace, count int) ([]ImportedChapterFacts, erro
 	for c := 1; c <= count; c++ {
 		a, err := readArtifact[ChapterAnalysisPayload](w, analysisPath(c))
 		if err != nil {
-			return out, fmt.Errorf("读取第 %d 章分析事实: %w", c, err)
+			return out, fmt.Errorf("đọc sự thực phân tích chương %d: %w", c, err)
 		}
 		out = append(out, a.Payload.Facts)
 	}
 	return out, nil
 }
 
-// buildLedger 从已分析章节派生紧凑连续性上下文：人物别名 + 活跃伏笔 ID + 最近状态。
+// buildLedger suy ngữ cảnh liên tục cô đọng từ các chương đã phân tích: biệt danh nhân vật +
+// ID phục bút đang hoạt động + trạng thái gần đây.
 func buildLedger(prior []ImportedChapterFacts) string {
 	if len(prior) == 0 {
 		return ""
@@ -184,30 +191,31 @@ func buildLedger(prior []ImportedChapterFacts) string {
 	}
 	var b strings.Builder
 	if len(names) > 0 {
-		b.WriteString("已知人物：")
-		b.WriteString(strings.Join(slices.Sorted(maps.Keys(names)), "、"))
+		b.WriteString("Nhân vật đã biết: ")
+		b.WriteString(strings.Join(slices.Sorted(maps.Keys(names)), ", "))
 		b.WriteString("\n")
 	}
 	if len(active) > 0 {
-		b.WriteString("活跃伏笔（复用 ID，勿新造）：\n")
+		b.WriteString("Phục bút đang hoạt động (tái sử dụng ID, đừng bịa mới):\n")
 		for _, id := range slices.Sorted(maps.Keys(active)) {
-			fmt.Fprintf(&b, "- %s：%s\n", id, active[id])
+			fmt.Fprintf(&b, "- %s: %s\n", id, active[id])
 		}
 	}
 	if len(recent) > 0 {
-		b.WriteString("最近状态：")
-		b.WriteString(strings.Join(recent, "；"))
+		b.WriteString("Trạng thái gần đây: ")
+		b.WriteString(strings.Join(recent, "; "))
 		b.WriteString("\n")
 	}
 	return b.String()
 }
 
-// planBatch 从 start 章起，按输入/输出双预算返回连续批次终点 end（[start,end)，章索引 0 起）。
-// 至少 1 章；单章即便超预算也单独成批，由执行方在截断时报告容量不足（RFC §9.2）。
+// planBatch từ chương start, theo ngân sách kép đầu vào/đầu ra trả về điểm cuối lô liên tiếp end
+// ([start,end), chỉ số chương từ 0). Ít nhất 1 chương; chương đơn dù vượt ngân sách cũng thành lô
+// riêng, bên thi hành báo dung lượng không đủ khi bị cắt ngắn (RFC §9.2).
 func planBatch(chapters []ChapterSpan, start, ledgerBytes int, b AnalyzeBudget) int {
 	end := start + 1
 	if b.ContextBytes <= 0 || b.MaxOutputTokens <= 0 || b.PerChapterOutput <= 0 {
-		return end // 预算未配置：逐章
+		return end // ngân sách chưa cấu hình: từng chương một
 	}
 	inAcc := ledgerBytes + b.PromptOverhead + chapterBytes(chapters, start)
 	outAcc := b.PerChapterOutput
@@ -230,9 +238,11 @@ func chapterBytes(chapters []ChapterSpan, i int) int {
 	return chapters[i].End - chapters[i].Start
 }
 
-// chapterInputDigest 逐章绑定分析工件身份：切分身份 + prompt/schema 版本 + 章号 + 单章正文。
-// 逐章而非批次级绑定——批次划分是随模型能力变化的执行细节，不应让换模型后已分析章节整体失效；
-// 绑定 segIdentity（segmentation 工件的 InputDigest）确保重切后所有分析自然失配（RFC §9.1/§6.3）。
+// chapterInputDigest ràng buộc danh tính artifact phân tích theo từng chương: danh tính phân tách
+// + phiên bản prompt/schema + số chương + chính văn đơn chương. Ràng theo từng chương thay vì theo
+// lô — cách chia lô là chi tiết thi hành thay đổi theo khả năng mô hình, không nên để đổi mô hình
+// làm vô hiệu cả loạt chương đã phân tích; ràng segIdentity (InputDigest của artifact segmentation)
+// đảm bảo phân tách lại thì mọi phân tích tự mất khớp (RFC §9.1/§6.3).
 func chapterInputDigest(segIdentity, promptVersion string, seg *Segmentation, normalized []byte, i int) string {
 	var b strings.Builder
 	b.WriteString("analyze\x00")
@@ -244,41 +254,44 @@ func chapterInputDigest(segIdentity, promptVersion string, seg *Segmentation, no
 	return Digest([]byte(b.String()))
 }
 
-// validateBatch 分两层校验：批次级连续无缺无重，逐章级值域与引用（RFC §9.4）。
+// validateBatch kiểm tra hai tầng: tầng lô liên tục không thiếu không trùng, tầng từng chương về
+// miền giá trị và tham chiếu (RFC §9.4).
 func validateBatch(r *AnalysisBatchResult, seg *Segmentation, start, end int) error {
 	want := end - start
 	if len(r.Chapters) != want {
-		return fmt.Errorf("批次章节数 %d != 预期 %d", len(r.Chapters), want)
+		return fmt.Errorf("số chương của lô %d != kỳ vọng %d", len(r.Chapters), want)
 	}
 	for i, f := range r.Chapters {
 		want := seg.Chapters[start+i]
 		if f.Chapter != want.Number {
-			return fmt.Errorf("批次第 %d 项章号 %d != %d", i, f.Chapter, want.Number)
+			return fmt.Errorf("mục %d của lô có số chương %d != %d", i, f.Chapter, want.Number)
 		}
 		if strings.TrimSpace(f.Summary) == "" || strings.TrimSpace(f.CoreEvent) == "" {
-			return fmt.Errorf("章 %d summary/core_event 不能为空", f.Chapter)
+			return fmt.Errorf("chương %d summary/core_event không được để trống", f.Chapter)
 		}
 		if !domain.ValidHookType(strings.ToLower(f.HookType)) {
-			return fmt.Errorf("章 %d hook_type 非法：%q", f.Chapter, f.HookType)
+			return fmt.Errorf("chương %d hook_type bất hợp lệ: %q", f.Chapter, f.HookType)
 		}
 		if !domain.ValidDominantStrand(strings.ToLower(f.DominantStrand)) {
-			return fmt.Errorf("章 %d dominant_strand 非法：%q", f.Chapter, f.DominantStrand)
+			return fmt.Errorf("chương %d dominant_strand bất hợp lệ: %q", f.Chapter, f.DominantStrand)
 		}
 		for j, fu := range f.ForeshadowUpdates {
 			if fu.Action == "plant" && strings.TrimSpace(fu.Description) == "" {
-				return fmt.Errorf("章 %d foreshadow[%d] plant 需 description", f.Chapter, j)
+				return fmt.Errorf("chương %d foreshadow[%d] plant cần description", f.Chapter, j)
 			}
 		}
-		// 枚举按小写校验就按小写落盘：commit_chapter 不复验枚举，大小写变体会直通正式状态
-		//（HookHistory 等按精确串消费，变体被视为未知类型），校验通过即归一化。
+		// Enum kiểm tra theo chữ thường thì ghi xuống đĩa theo chữ thường: commit_chapter không
+		// kiểm tra lại enum, biến thể hoa/thường sẽ đi thẳng vào trạng thái chính thức (HookHistory
+		// v.v. tiêu thụ theo chuỗi chính xác, biến thể bị coi là loại lạ), qua kiểm tra thì chuẩn hóa.
 		r.Chapters[i].HookType = strings.ToLower(f.HookType)
 		r.Chapters[i].DominantStrand = strings.ToLower(f.DominantStrand)
 	}
 	return nil
 }
 
-// AnalyzeNext 从第一份缺失分析起组一个批次并原子落盘，返回本次提交的章节数。
-// 截断即「失败 + 缩小重组批」（默认，§9.5）；批次已缩到单章仍截断则显式报告容量不足。
+// AnalyzeNext gộp một lô từ bản phân tích thiếu đầu tiên và ghi nguyên tử xuống đĩa, trả về số
+// chương nộp lần này. Bị cắt ngắn thì "thất bại + thu nhỏ tổ hợp lại lô" (mặc định, §9.5); lô đã
+// co còn một chương mà vẫn bị cắt thì báo rõ dung lượng không đủ.
 func AnalyzeNext(ctx context.Context, m callModel, systemPrompt string, w *Workspace, normalized []byte, seg *Segmentation, segIdentity, promptVersion string, budget AnalyzeBudget, prof callProfile) (int, error) {
 	total := len(seg.Chapters)
 	start := analyzedChapters(w, seg, normalized, segIdentity, promptVersion)
@@ -296,34 +309,37 @@ func AnalyzeNext(ctx context.Context, m callModel, systemPrompt string, w *Works
 		if err != nil {
 			var tr *errTruncated
 			if errors.As(err, &tr) {
-				// 截断优先打捞从批次首章起的最大连续合法前缀，已提交部分不重做（§9.5）。
+				// Bị cắt ngắn thì ưu tiên cứu vớt tiền tố hợp lệ liên tục lớn nhất tính từ chương đầu
+				// lô, phần đã nộp không làm lại (§9.5).
 				if salvaged := salvagePrefix(tr.Raw, seg, start); len(salvaged) > 0 {
 					for i, f := range salvaged {
 						ch := start + i + 1
 						digest := chapterInputDigest(segIdentity, promptVersion, seg, normalized, start+i)
 						art := ChapterAnalysisPayload{BatchStart: start + 1, BatchEnd: end, Facts: f}
 						if werr := writeArtifact(w, analysisPath(ch), digest, art); werr != nil {
-							return i, fmt.Errorf("落盘打捞章 %d：%w", ch, werr)
+							return i, fmt.Errorf("ghi chương cứu vớt %d: %w", ch, werr)
 						}
 					}
-					w.writeFailure(FailureMeta{Stage: "analyze", Detail: fmt.Sprintf("批次 %d-%d 长度截断", start+1, end),
+					w.writeFailure(FailureMeta{Stage: "analyze", Detail: fmt.Sprintf("lô %d-%d bị cắt ngắn độ dài", start+1, end),
 						StopReason: "length", PrefixSalvage: fmt.Sprintf("available:%d", len(salvaged))}, tr.Raw)
-					prof.logger().Info("imp 分析截断，打捞连续前缀", "batch_start", start+1, "salvaged", len(salvaged))
+					prof.logger().Info("imp phân tích bị cắt ngắn, cứu vớt tiền tố liên tiếp", "batch_start", start+1, "salvaged", len(salvaged))
 					echoChapterFacts(prof, salvaged)
 					return len(salvaged), nil
 				}
-				// 无可打捞前缀：记录不可用并「失败 + 缩小重组批」，单章仍截断则报容量不足。
-				w.writeFailure(FailureMeta{Stage: "analyze", Detail: fmt.Sprintf("批次 %d-%d 长度截断，无可打捞前缀", start+1, end),
+				// Không có tiền tố cứu vớt được: ghi là không khả dụng và "thất bại + thu nhỏ tổ hợp
+				// lại lô", một chương mà vẫn cắt thì báo dung lượng không đủ.
+				w.writeFailure(FailureMeta{Stage: "analyze", Detail: fmt.Sprintf("lô %d-%d bị cắt ngắn độ dài, không có tiền tố cứu vớt được", start+1, end),
 					StopReason: "length", PrefixSalvage: "unavailable"}, tr.Raw)
 				if end-start > 1 {
-					prof.logger().Warn("imp 分析截断，缩小重组批", "batch", fmt.Sprintf("%d-%d", start+1, end), "prefix_salvage", "unavailable")
+					prof.logger().Warn("imp phân tích bị cắt ngắn, thu nhỏ tổ hợp lại lô", "batch", fmt.Sprintf("%d-%d", start+1, end), "prefix_salvage", "unavailable")
 					end = start + (end-start)/2
-					// 无 Key 的进度行：既让用户看见缩批动作，也隔断前后两次独立调用的
-					// 退避行按同 Key 误合并（Key 契约只覆盖同一调用内的瞬态退避）。
-					prof.step(0, 0, "输出被长度截断且无可打捞前缀，缩小批次为第 %d-%d 章重试", start+1, end)
+					// Dòng tiến độ không Key: vừa cho người dùng thấy hành động thu nhỏ lô, vừa ngăn
+					// dòng backoff của hai lần gọi độc lập trước sau bị gộp nhầm cùng Key (hợp đồng
+					// Key chỉ bao backoff nhất thời trong cùng một lần gọi).
+					prof.step(0, 0, "đầu ra bị cắt ngắn độ dài và không có tiền tố cứu vớt, thu nhỏ lô còn chương %d-%d rồi thử lại", start+1, end)
 					continue
 				}
-				return 0, fmt.Errorf("章 %d 单章批次仍被长度截断，模型可见输出能力不足", start+1)
+				return 0, fmt.Errorf("chương %d lô đơn chương vẫn bị cắt ngắn độ dài, khả năng đầu ra khả kiến của mô hình không đủ", start+1)
 			}
 			return 0, err
 		}
@@ -332,7 +348,7 @@ func AnalyzeNext(ctx context.Context, m callModel, systemPrompt string, w *Works
 			digest := chapterInputDigest(segIdentity, promptVersion, seg, normalized, start+i)
 			payloadArt := ChapterAnalysisPayload{BatchStart: start + 1, BatchEnd: end, Facts: f}
 			if err := writeArtifact(w, analysisPath(ch), digest, payloadArt); err != nil {
-				return i, fmt.Errorf("落盘章 %d 分析：%w", ch, err)
+				return i, fmt.Errorf("ghi phân tích chương %d: %w", ch, err)
 			}
 		}
 		echoChapterFacts(prof, res.Chapters)
@@ -340,64 +356,65 @@ func AnalyzeNext(ctx context.Context, m callModel, systemPrompt string, w *Works
 	}
 }
 
-// echoChapterFacts 把模型对每章的核心理解回显到面板——用户应看见模型读懂了什么，
-// 而非只有机械的批次计数（§14.1）。
+// echoChapterFacts hiển thị lại lên bảng hiểu cốt lõi của mô hình về mỗi chương — người dùng
+// cần thấy mô hình đã đọc hiểu gì, chứ không chỉ số đếm lô máy móc (§14.1).
 func echoChapterFacts(prof callProfile, facts []ImportedChapterFacts) {
 	for _, f := range facts {
-		prof.step(0, 0, "第 %d 章〈%s〉：%s", f.Chapter, snippet(f.Title, 24), snippet(f.CoreEvent, 60))
+		prof.step(0, 0, "Chương %d \"%s\": %s", f.Chapter, snippet(f.Title, 24), snippet(f.CoreEvent, 60))
 	}
 }
 
-// buildAnalyzePayload 组装批次输入：连续章节原文 + 批次前 ledger。
+// buildAnalyzePayload lắp đầu vào lô: nguyên văn các chương liên tiếp + ledger trước lô.
 func buildAnalyzePayload(normalized []byte, seg *Segmentation, ledger string, start, end int) string {
 	var b strings.Builder
-	fmt.Fprintf(&b, "请分析第 %d-%d 章，返回 {\"chapters\":[每章一个事实对象]}，数组顺序与章号一致。\n\n", start+1, end)
+	fmt.Fprintf(&b, "Hãy phân tích chương %d-%d, trả về {\"chapters\":[mỗi chương một đối tượng sự thực]}, thứ tự mảng theo đúng số chương.\n\n", start+1, end)
 	if ledger != "" {
-		b.WriteString("## 连续性 ledger（参考）\n\n")
+		b.WriteString("## Ledger liên tục (tham khảo)\n\n")
 		b.WriteString(ledger)
 		b.WriteString("\n")
 	}
 	for i := start; i < end; i++ {
 		c := seg.Chapters[i]
-		fmt.Fprintf(&b, "## 第 %d 章：%s\n\n", c.Number, c.Title)
+		fmt.Fprintf(&b, "## Chương %d: %s\n\n", c.Number, c.Title)
 		b.WriteString(seg.Content(normalized, i))
 		b.WriteString("\n\n---\n\n")
 	}
 	return b.String()
 }
 
-// salvagePrefix 从长度截断的批次响应中解析最大连续合法前缀（RFC §9.5）。
-// 只保存从批次首章起连续、逐章校验通过的对象；遇首个不完整/非法/跳号即停，之后字节不解释。
-// 纯函数，由 AnalyzeNext 在容量截断时优先调用，避免丢弃已完整生成的前缀章节。
+// salvagePrefix phân tích từ phản hồi lô bị cắt ngắn độ dài tiền tố hợp lệ liên tục lớn nhất
+// (RFC §9.5). Chỉ lưu các đối tượng liên tục từ chương đầu lô, qua kiểm tra từng chương; gặp đối
+// tượng đầu tiên không trọn vẹn/bất hợp lệ/bỏ số thì dừng, các byte sau không diễn giải. Hàm thuần,
+// do AnalyzeNext ưu tiên gọi khi bị cắt ngắn dung lượng, tránh vứt các chương tiền tố đã sinh trọn vẹn.
 func salvagePrefix(raw string, seg *Segmentation, start int) []ImportedChapterFacts {
 	arr := extractChaptersArray(raw)
 	if arr == "" {
 		return nil
 	}
 	dec := json.NewDecoder(strings.NewReader(arr))
-	if _, err := dec.Token(); err != nil { // 消费 '['
+	if _, err := dec.Token(); err != nil { // tiêu thụ '['
 		return nil
 	}
 	var out []ImportedChapterFacts
 	for dec.More() {
 		var f ImportedChapterFacts
 		if err := dec.Decode(&f); err != nil {
-			break // 首个不完整对象，停止
+			break // đối tượng đầu tiên không trọn vẹn, dừng
 		}
 		idx := start + len(out)
 		if idx >= len(seg.Chapters) || f.Chapter != seg.Chapters[idx].Number {
-			break // 跳号/越界
+			break // bỏ số/ra ngoài biên
 		}
 		one := AnalysisBatchResult{Chapters: []ImportedChapterFacts{f}}
 		if err := validateBatch(&one, seg, idx, idx+1); err != nil {
 			break
 		}
-		out = append(out, one.Chapters[0]) // validateBatch 已就地归一化枚举，取校验后的值
+		out = append(out, one.Chapters[0]) // validateBatch đã chuẩn hóa enum tại chỗ, lấy giá trị sau kiểm tra
 	}
 	return out
 }
 
-// extractChaptersArray 截取 "chapters" 后的 JSON 数组文本（可被尾部截断）。
+// extractChaptersArray cắt lấy văn bản mảng JSON sau "chapters" (có thể bị cắt ở đuôi).
 func extractChaptersArray(raw string) string {
 	i := strings.Index(raw, "\"chapters\"")
 	if i < 0 {
