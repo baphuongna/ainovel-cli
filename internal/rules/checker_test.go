@@ -2,6 +2,8 @@ package rules
 
 import (
 	"testing"
+
+	"golang.org/x/text/unicode/norm"
 )
 
 // findViolation 在结果中按 rule + target 查找第一条违规。
@@ -142,5 +144,41 @@ func TestCheck_EmptyTargetsSkipped(t *testing.T) {
 	})
 	if len(vs) != 0 {
 		t.Errorf("empty targets should be skipped, got %+v", vs)
+	}
+}
+
+// Văn tiếng Việt: không phân biệt hoa thường, khớp trọn từ, và chịu được NFD.
+func TestCheckVietnameseMatching(t *testing.T) {
+	text := "Như thể mọi thứ dừng lại. Ta đưa tay lên, ta thở dài. Nó tan biến như thể chưa từng tồn tại."
+	vs := Check(text, Structured{
+		ForbiddenPhrases: []string{"như thể"},
+		FatigueWords:     map[string]int{"ta": 1},
+	})
+	got := map[string]int{}
+	for _, v := range vs {
+		got[v.Rule+":"+v.Target], _ = v.Actual.(int)
+	}
+	if got["forbidden_phrases:như thể"] != 2 {
+		t.Errorf("như thể (kể cả đầu câu viết hoa) = %d, want 2 (%+v)", got["forbidden_phrases:như thể"], vs)
+	}
+	// "ta" xuất hiện 2 lần như một từ; "tay", "tan" không được tính.
+	if got["fatigue_words:ta"] != 2 {
+		t.Errorf("fatigue ta = %d, want 2 (%+v)", got["fatigue_words:ta"], vs)
+	}
+
+	nfd := norm.NFD.String(text)
+	if nfd == text {
+		t.Fatal("fixture NFD phải khác NFC")
+	}
+	if n := len(Check(nfd, Structured{ForbiddenPhrases: []string{"như thể"}})); n != 1 {
+		t.Errorf("văn NFD không bắt được forbidden phrase NFC")
+	}
+}
+
+// Tiếng Trung giữ nguyên hành vi đếm chuỗi con.
+func TestCheckChineseSubstringUnchanged(t *testing.T) {
+	vs := Check("他仿佛看见了，仿佛听见了。", Structured{ForbiddenPhrases: []string{"仿佛"}})
+	if len(vs) != 1 || vs[0].Actual != 2 {
+		t.Errorf("zh substring count: %+v", vs)
 	}
 }

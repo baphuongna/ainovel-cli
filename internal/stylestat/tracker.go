@@ -53,6 +53,7 @@ func (t *Tracker) Upsert(chapter int, text string) {
 	defer t.mu.Unlock()
 	t.ensure()
 
+	text = NormalizeText(text)
 	if previous, ok := t.chapters[chapter]; ok {
 		if previous.text == text {
 			return
@@ -232,7 +233,7 @@ func analyzeChapter(text string) chapterStats {
 		sentences: chapterSentenceCounts(text),
 	}
 	for i, def := range patternDefs {
-		stats.patterns[i] = len(def.re.FindAllStringIndex(text, -1))
+		stats.patterns[i] = countPattern(def.re, def.exclude, text)
 	}
 	if ending := lastNonEmptyLine(text); ending != "" {
 		stats.endingRunes = len([]rune(ending))
@@ -246,7 +247,7 @@ func chapterSentenceCounts(text string) map[string]int {
 	counts := make(map[string]int)
 	for _, sentence := range sentenceSplit.Split(text, -1) {
 		sentence = trimWrappedQuotes(sentence)
-		if len([]rune(sentence)) < 12 {
+		if len([]rune(sentence)) < minSentenceRunes(sentence) {
 			continue
 		}
 		counts[sentence]++

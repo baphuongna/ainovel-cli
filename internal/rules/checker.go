@@ -1,9 +1,5 @@
 package rules
 
-import (
-	"strings"
-)
-
 // Check kiểm tra cơ học chính văn chương theo quy tắc cấu trúc, trả danh sách sự thực vi phạm.
 //
 // Hợp đồng thiết kế:
@@ -33,7 +29,7 @@ func appendForbiddenChars(vs []Violation, text string, list []string) []Violatio
 		if ch == "" {
 			continue
 		}
-		n := strings.Count(text, ch)
+		n := countOccurrences(text, ch)
 		if n == 0 {
 			continue
 		}
@@ -53,7 +49,7 @@ func appendForbiddenPhrases(vs []Violation, text string, list []string) []Violat
 		if ph == "" {
 			continue
 		}
-		n := strings.Count(text, ph)
+		n := countOccurrences(text, ph)
 		if n == 0 {
 			continue
 		}
@@ -74,7 +70,7 @@ func appendFatigueWords(vs []Violation, text string, m map[string]int) []Violati
 		if word == "" || limit <= 0 {
 			continue
 		}
-		n := strings.Count(text, word)
+		n := countOccurrences(text, word)
 		if n <= limit {
 			continue
 		}

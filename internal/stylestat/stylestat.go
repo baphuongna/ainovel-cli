@@ -77,26 +77,36 @@ type TitleStat struct {
 var patternDefs = []struct {
 	name string
 	re   *regexp.Regexp
+	// exclude (tùy chọn) trừ bớt các lần khớp nằm trong ngữ cảnh vô hại, thay cho
+	// lookbehind mà regexp của Go không hỗ trợ.
+	exclude *regexp.Regexp
 }{
-	{"Câu hiệu chỉnh \"不是…(而)是…\"", regexp.MustCompile(`不是[^。！？\n]{1,24}?[，、]?(?:而)?是`)},
-	{"Lượng từ thời gian \"X息/X瞬\"", regexp.MustCompile(`[一两二三四五六七八九十几数半][息瞬]`)},
-	{"Ví von trực tiếp \"像一/仿佛/如同/宛如\"", regexp.MustCompile(`像一|仿佛|如同|宛如`)},
-	{"Nhịp im lặng \"沉默了/没有说话/没有回头\"", regexp.MustCompile(`沉默了|没有说话|没有回头`)},
-	{"Mẫu thần thái \"眼中闪过/嘴角勾起/咬了咬唇\"", regexp.MustCompile(`眼[中底]闪过|目光一凝|瞳孔一缩|眼眶微红|嘴角[微轻一]?[勾扬翘]|咬了咬唇|不可置信`)},
-	{"Phản ứng thân thể \"心头一紧/身子一颤/倒吸凉气\"", regexp.MustCompile(`心头一[紧沉颤]|身子一[颤震僵]|倒吸(?:了)?一口凉气`)},
-	{"Dấu hiệu tư duy \"心想/意识到/感到/觉得\"", regexp.MustCompile(`心想|意识到|感到|觉得`)},
-	{"Sáo ngữ trừu tượng \"一种说不出的/的意义在于\"", regexp.MustCompile(`一种说不出的|说不清[的道]|的意义在于|真正的[^。！？\n]{1,10}是`)},
+	{name: "Câu hiệu chỉnh \"不是…(而)是…\"", re: regexp.MustCompile(`不是[^。！？\n]{1,24}?[，、]?(?:而)?是`)},
+	{name: "Lượng từ thời gian \"X息/X瞬\"", re: regexp.MustCompile(`[一两二三四五六七八九十几数半][息瞬]`)},
+	{name: "Ví von trực tiếp \"像一/仿佛/如同/宛如\"", re: regexp.MustCompile(`像一|仿佛|如同|宛如`)},
+	{name: "Nhịp im lặng \"沉默了/没有说话/没有回头\"", re: regexp.MustCompile(`沉默了|没有说话|没有回头`)},
+	{name: "Mẫu thần thái \"眼中闪过/嘴角勾起/咬了咬唇\"", re: regexp.MustCompile(`眼[中底]闪过|目光一凝|瞳孔一缩|眼眶微红|嘴角[微轻一]?[勾扬翘]|咬了咬唇|不可置信`)},
+	{name: "Phản ứng thân thể \"心头一紧/身子一颤/倒吸凉气\"", re: regexp.MustCompile(`心头一[紧沉颤]|身子一[颤震僵]|倒吸(?:了)?一口凉气`)},
+	{name: "Dấu hiệu tư duy \"心想/意识到/感到/觉得\"", re: regexp.MustCompile(`心想|意识到|感到|觉得`)},
+	{name: "Sáo ngữ trừu tượng \"一种说不出的/的意义在于\"", re: regexp.MustCompile(`一种说不出的|说不清[的道]|的意义在于|真正的[^。！？\n]{1,10}是`)},
 	// Mẫu tic văn phong AI tiếng Việt (sản phẩm mặc định language=vi — văn dịch/dở
 	// hay lặp các cụm dưới với mật độ cao). Regex không phân biệt hoa thường vì
 	// tiếng Việt viết hoa chữ đầu câu; chuỗi zh phía trên sẽ không khớp văn vi
 	// và ngược lại — hai bộ cùng tồn tại, mỗi sách chỉ đếm đúng ngôn ngữ của nó.
-	{"Câu hiệu chỉnh \"không phải… mà là…\"", regexp.MustCompile(`(?i)không phải [^.!?\n。！？]{1,80}? mà là`)},
-	{"Ví von trực tiếp \"như một/tựa như/như thể\"", regexp.MustCompile(`(?i)như một|tựa như|như thể|giống như một`)},
-	{"Nhịp im lặng \"im lặng/không nói gì\"", regexp.MustCompile(`(?i)im lặng|không nói gì|không quay đầu`)},
-	{"Mẫu thần thái \"khẽ nhíu mày/khóe môi khẽ\"", regexp.MustCompile(`(?i)khẽ nhíu mày|khẽ cau mày|khóe môi (?:khẽ|nhếch)|ánh mắt (?:lóe|khẽ)|sắc mặt (?:khẽ|đổi)|đôi mắt khẽ`)},
-	{"Phản ứng thân thể \"trái tim thắt/rùng mình\"", regexp.MustCompile(`(?i)trái tim thắt|thắt lại|rùng mình|hụt nhịp|lạnh sống lưng|quặn (?:đau|lòng)`)},
-	{"Dấu hiệu tư duy \"nghĩ thầm/trong lòng nghĩ\"", regexp.MustCompile(`(?i)nghĩ thầm|trong lòng nghĩ|ý thức được`)},
-	{"Sáo ngữ trừu tượng \"một cảm giác khó tả\"", regexp.MustCompile(`(?i)một cảm giác (?:khó tả|khó nói|không tên)|không nói nên lời|(?:thời gian|không gian) như ngừng lại`)},
+	{name: "Câu hiệu chỉnh \"không phải… mà là…\"", re: regexp.MustCompile(`(?i)không phải [^.!?\n。！？]{1,80}? mà là`)},
+	// "như một" trần khớp cả "coi như một", "xem như một" (không phải ví von) → loại trừ.
+	{name: "Ví von trực tiếp \"như một/tựa như/như thể\"",
+		re:      regexp.MustCompile(`(?i)như một|tựa như|tựa hồ|như thể|hệt như`),
+		exclude: regexp.MustCompile(`(?i)(?:coi|xem|gần|hầu) như một`)},
+	// "im lặng" làm danh từ/tính từ miêu tả cảnh ("sự im lặng", "căn phòng im lặng",
+	// "trong im lặng") là văn bình thường; chỉ tic hành động lặng thinh mới đáng đếm.
+	{name: "Nhịp im lặng \"im lặng/không nói gì\"",
+		re:      regexp.MustCompile(`(?i)im lặng|không nói gì|không quay đầu`),
+		exclude: regexp.MustCompile(`(?i)(?:sự|trong|vào|giữa|phá vỡ|bầu|khoảng|không gian|căn phòng|căn nhà|xung quanh|bốn bề|màn đêm|khu rừng|con phố) im lặng|im lặng (?:bao trùm|phủ|tuyệt đối|đến đáng sợ)`)},
+	{name: "Mẫu thần thái \"khẽ nhíu mày/khóe môi khẽ\"", re: regexp.MustCompile(`(?i)khẽ nhíu mày|khẽ cau mày|khóe môi (?:khẽ|nhếch)|ánh mắt (?:lóe|khẽ)|sắc mặt (?:khẽ|đổi)|đôi mắt khẽ`)},
+	{name: "Phản ứng thân thể \"trái tim thắt/rùng mình\"", re: regexp.MustCompile(`(?i)(?:tim|trái tim|lồng ngực|ngực|cổ họng|dạ dày) (?:chợt |bỗng |khẽ )?thắt lại|trái tim thắt|rùng mình|hụt (?:mất )?một nhịp|lạnh sống lưng|quặn (?:đau|lòng)`)},
+	{name: "Dấu hiệu tư duy \"nghĩ thầm/trong lòng nghĩ\"", re: regexp.MustCompile(`(?i)nghĩ thầm|trong lòng nghĩ|ý thức được`)},
+	{name: "Sáo ngữ trừu tượng \"một cảm giác khó tả\"", re: regexp.MustCompile(`(?i)một cảm giác (?:khó tả|khó nói|không tên)|không nói nên lời|(?:thời gian|không gian) như ngừng lại`)},
 }
 
 var (
@@ -118,11 +128,16 @@ func Compute(in Input) *Stats {
 	if n < minChapters {
 		return nil
 	}
+	chapters := make([]string, len(in.Chapters))
+	for i, c := range in.Chapters {
+		chapters[i] = NormalizeText(c)
+	}
+	in.Chapters = chapters
 	all := strings.Join(in.Chapters, "\n")
 
 	s := &Stats{Chapters: n}
 	for _, def := range patternDefs {
-		total := len(def.re.FindAllStringIndex(all, -1))
+		total := countPattern(def.re, def.exclude, all)
 		if total == 0 {
 			continue
 		}
@@ -147,10 +162,14 @@ func recentWindow(chapters []string) []string {
 	return chapters[len(chapters)-phraseWindow:]
 }
 
-// minePhrases khai thác cụm từ tần suất cao 3-6 ký tự trong cửa sổ.
+// minePhrases khai thác cụm từ tần suất cao trong cửa sổ: văn chữ Hán dùng n-gram 3-6 ký tự,
+// văn tiếng Việt / chữ Latin dùng n-gram 3-5 âm tiết (xem viet.go).
 // Lọc: chứa dấu câu/khoảng trắng, hư từ đầu/cuối, trúng tên riêng; khử trùng: cụm nào là chuỗi con của cụm đã chọn thì bỏ.
 func minePhrases(chapters []string, stopwords []string) []PhraseStat {
 	text := strings.Join(chapters, "\n")
+	if !hanDominant(text) {
+		return mineWordPhrases(chapters, stopwords)
+	}
 	runes := []rune(text)
 	threshold := max(8, len(chapters)/2)
 
@@ -379,3 +398,12 @@ func truncateRunes(s string, n int) string {
 
 func round1(f float64) float64 { return float64(int(f*10+0.5)) / 10 }
 func round2(f float64) float64 { return float64(int(f*100+0.5)) / 100 }
+
+// countPattern đếm số lần khớp của re, trừ đi các lần khớp của exclude (nếu có).
+func countPattern(re, exclude *regexp.Regexp, text string) int {
+	n := len(re.FindAllStringIndex(text, -1))
+	if exclude != nil {
+		n -= len(exclude.FindAllStringIndex(text, -1))
+	}
+	return max(n, 0)
+}

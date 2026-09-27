@@ -16,6 +16,7 @@ import (
 //   - non_cjk_fragments / cjk_leak: đoạn văn trộn lẫn chữ, hướng tự phán định theo chữ chính của chính văn
 //     (chính văn tiếng Trung thì báo đoạn Latin; chính văn chữ Latin như tiếng Việt thì báo đoạn chữ Hán)
 func Lint(text string) []Violation {
+	text = normalize(text)
 	var vs []Violation
 	vs = appendMarkdownResidue(vs, text)
 	vs = appendScriptMixing(vs, text)
@@ -210,6 +211,12 @@ func appendSelfDuplication(vs []Violation, text string) []Violation {
 // mà chương chép đó bên trong hoàn toàn sạch. Vì vậy phải so riêng theo "văn bản trước".
 // previous rỗng thì bỏ qua.
 func CheckAgainstPrevious(text string, previous []string) []Violation {
+	text = normalize(text)
+	normalized := make([]string, len(previous))
+	for i, p := range previous {
+		normalized[i] = normalize(p)
+	}
+	previous = normalized
 	cur := paragraphs(text)
 	if len(cur) == 0 || len(previous) == 0 {
 		return nil
