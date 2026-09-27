@@ -2,6 +2,8 @@
 
 Các cung truyện dưới đây phù hợp với tiểu thuyết dài thể loại trinh thám, suy lý, hình sự và hồi hộp. Kết hợp tự do tùy theo bối cảnh cụ thể, không nhất thiết phải dùng hết.
 
+> **Giới hạn hệ thống**: mỗi cung (arc) tối đa **8 chương chi tiết** — công cụ từ chối cung dài hơn, kể cả cung khung xương. Số chương ghi bên dưới là quy mô của **cả mạch truyện**; khi quy hoạch, hãy tách mạch đó thành nhiều cung liên tiếp (mỗi cung ≤ 8 chương, có mục tiêu riêng).
+
 ### Cung Điều Tra Vụ Án (10-15 chương)
 2-3 chương vụ án xảy ra / khám nghiệm hiện trường → 3-5 chương điều tra nhiều hướng (mỗi manh mối mở ra nghi vấn mới) → 2-3 chương đột phá then chốt → 1-2 chương tiết lộ sự thật + hậu quả
 

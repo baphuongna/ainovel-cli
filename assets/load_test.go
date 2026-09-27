@@ -196,3 +196,49 @@ func TestOverrideVoice_SharesAssemblyPath(t *testing.T) {
 		t.Fatal("Phần giao thức không được bị phá hủy bởi override voice")
 	}
 }
+
+// TestPromptsVIParityWithZH chặn tái diễn lỗi prompt tiếng Việt bị cắt cụt khi dịch:
+// trước đây architect-long / editor bản vi mất gần nửa nội dung (chế độ tạo tập tiếp
+// theo, danh sách phán định hoàn thành, tiêu chuẩn verdict, xem xét cấp cung/tập...).
+// Mỗi prompt vi phải có cùng số tiêu đề Markdown với bản zh và không ngắn hơn quá nhiều.
+func TestPromptsVIParityWithZH(t *testing.T) {
+	entries, err := promptsFS.ReadDir("prompts/zh")
+	if err != nil {
+		t.Fatalf("đọc prompts/zh: %v", err)
+	}
+	countHeadings := func(s string) int {
+		n := 0
+		for _, line := range strings.Split(s, "\n") {
+			if strings.HasPrefix(line, "#") {
+				n++
+			}
+		}
+		return n
+	}
+	for _, e := range entries {
+		name := e.Name()
+		zh, err := promptsFS.ReadFile("prompts/zh/" + name)
+		if err != nil {
+			t.Fatalf("đọc zh/%s: %v", name, err)
+		}
+		vi, err := promptsFS.ReadFile("prompts/" + name)
+		if err != nil {
+			t.Errorf("thiếu bản tiếng Việt cho prompts/zh/%s", name)
+			continue
+		}
+		if hz, hv := countHeadings(string(zh)), countHeadings(string(vi)); hz != hv {
+			t.Errorf("prompts/%s: %d tiêu đề, bản zh có %d — bản dịch thiếu mục", name, hv, hz)
+		}
+		// Văn tiếng Việt luôn dài hơn tiếng Trung về số rune (khoảng 2-3 lần);
+		// ngắn hơn bản zh là dấu hiệu chắc chắn bị cắt.
+		if rz, rv := len([]rune(string(zh))), len([]rune(string(vi))); rv < rz {
+			t.Errorf("prompts/%s: %d rune, ít hơn bản zh (%d) — nghi bị cắt cụt", name, rv, rz)
+		}
+		for _, r := range string(vi) {
+			if r >= 0x4E00 && r <= 0x9FFF {
+				t.Errorf("prompts/%s chứa chữ Hán %q — dễ làm model rò chữ Hán vào chính văn", name, r)
+				break
+			}
+		}
+	}
+}

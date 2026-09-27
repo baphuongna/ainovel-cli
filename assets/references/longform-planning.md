@@ -97,6 +97,8 @@ Khi lập kế hoạch phải nghĩ rõ trước:
 
 ## Mật Độ Nhịp Điệu Cấp Cung Truyện
 
+> **Giới hạn hệ thống**: mỗi cung (arc) tối đa **8 chương chi tiết** — công cụ từ chối cung dài hơn, kể cả cung khung xương. Số chương ghi bên dưới là quy mô của **cả mạch truyện**; khi quy hoạch, hãy tách mạch đó thành nhiều cung liên tiếp (mỗi cung ≤ 8 chương, có mục tiêu riêng).
+
 Mỗi cung truyện nên tuân theo vòng nhịp điệu "phủ nền → tích lũy → bùng nổ → thu hoạch". Dưới đây là mật độ tham chiếu cho các kiểu cung truyện phổ biến (tự điều chỉnh theo thể loại):
 
 - **Cung truyện đột phá trưởng thành** (10-15 chương): 3-4 chương thiếu năng lực/chuẩn bị → 2-3 chương thử thách bên ngoài/thử luyện → 2-3 chương đột phá then chốt → 1-2 chương thể hiện+thu hoạch. Phù hợp với: tu luyện thăng cấp, học kỹ năng, đột phá phá án, thăng tiến công sở, v.v.

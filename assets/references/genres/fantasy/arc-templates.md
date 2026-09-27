@@ -2,6 +2,8 @@
 
 Các cung truyện dưới đây phù hợp với tiểu thuyết dài thể loại tu tiên, huyền huyễn, phiêu lưu fantasy. Có thể kết hợp tự do tùy theo bối cảnh cụ thể, không cần dùng tất cả.
 
+> **Giới hạn hệ thống**: mỗi cung (arc) tối đa **8 chương chi tiết** — công cụ từ chối cung dài hơn, kể cả cung khung xương. Số chương ghi bên dưới là quy mô của **cả mạch truyện**; khi quy hoạch, hãy tách mạch đó thành nhiều cung liên tiếp (mỗi cung ≤ 8 chương, có mục tiêu riêng).
+
 ### Cung Truyện Đột Phá Tu Luyện (10-15 chương)
 3-4 chương bế tắc/thiếu hụt tài nguyên → 2-3 chương ngoại lực cản trở hoặc cơ duyên bất ngờ → 2-3 chương bế quan đột phá (xen kẽ khủng hoảng) → 1-2 chương phô diễn thực lực + thu hoạch
 - Trước khi đột phá phải có cái giá hoặc rủi ro rõ ràng

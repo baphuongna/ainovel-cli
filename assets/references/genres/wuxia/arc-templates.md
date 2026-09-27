@@ -2,6 +2,8 @@
 
 Các cung truyện dưới đây phù hợp với tiểu thuyết mạng dài kỳ thể loại xuyên không, hệ thống, võ hiệp, cẩu đạo, vô địch lưu, phàm nhân lưu. Kết hợp tự do theo bối cảnh, không cần dùng tất cả.
 
+> **Giới hạn hệ thống**: mỗi cung (arc) tối đa **8 chương chi tiết** — công cụ từ chối cung dài hơn, kể cả cung khung xương. Số chương ghi bên dưới là quy mô của **cả mạch truyện**; khi quy hoạch, hãy tách mạch đó thành nhiều cung liên tiếp (mỗi cung ≤ 8 chương, có mục tiêu riêng).
+
 ### Cung Truyện Tiếp Quản Thân Xác / Cắt Nghiệt Duyên (6-10 chương)
 2-3 chương tiếp nhận ký ức và nhận ra mớ hỗn độn nguyên chủ để lại → 1-2 chương dứt khoát cắt đứt quan hệ độc hại → 2-3 chương phát hiện và thử nghiệm kim thủ chỉ → 1-2 chương đặt ra nguyên tắc hành sự mới
 - Sự tương phản giữa nguyên chủ và nhân vật chính phải thể hiện qua hành động cụ thể, không qua độc thoại tổng kết

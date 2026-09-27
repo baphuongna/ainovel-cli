@@ -2,6 +2,8 @@
 
 Các cung truyện dưới đây phù hợp với truyện dài thể loại ngôn tình, cảm xúc, thanh xuân, tình yêu đô thị. Có thể kết hợp tự do tùy theo bối cảnh cụ thể, không cần sử dụng tất cả.
 
+> **Giới hạn hệ thống**: mỗi cung (arc) tối đa **8 chương chi tiết** — công cụ từ chối cung dài hơn, kể cả cung khung xương. Số chương ghi bên dưới là quy mô của **cả mạch truyện**; khi quy hoạch, hãy tách mạch đó thành nhiều cung liên tiếp (mỗi cung ≤ 8 chương, có mục tiêu riêng).
+
 ### Cung Gặp Gỡ / Tái Ngộ (8-12 chương)
 2-3 chương cuộc sống thường ngày của từng người (xây dựng tính độc lập của nhân vật) → 3-5 chương cuộc gặp gỡ quan trọng + tiếp xúc bắt buộc (tạo ma sát và ấn tượng đầu tiên) → 2-3 chương bước đầu tìm hiểu + chuyển biến tinh tế
 - Ấn tượng đầu tiên tốt nhất không phải là yêu từ cái nhìn đầu tiên, mà là hiểu lầm hoặc xung đột
